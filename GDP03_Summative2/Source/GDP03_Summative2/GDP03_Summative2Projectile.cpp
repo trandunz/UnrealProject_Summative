@@ -32,7 +32,7 @@ AGDP03_Summative2Projectile::AGDP03_Summative2Projectile()
 	// Die after 3 seconds by default
 	InitialLifeSpan = 3.0f;
 
-	SetReplicates(true);
+	bReplicates = true;
 	SetReplicateMovement(true);
 }
 
