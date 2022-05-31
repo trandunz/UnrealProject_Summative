@@ -15,8 +15,8 @@ public class GDP03_Summative2 : ModuleRules
 			"Engine",
 			"InputCore", 
 			"HeadMountedDisplay" ,
-			"OnlineSubsystem",
-			"OnlineSubsystemSteam"
+			"OnlineSubsystemSteam",
+			"OnlineSubsystem"
 		});
 	}
 }

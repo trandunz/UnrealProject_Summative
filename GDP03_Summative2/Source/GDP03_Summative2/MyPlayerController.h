@@ -25,7 +25,17 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "OnlineSession")
 		bool HostSession();
 
+	UFUNCTION(BlueprintCallable, Category = "OnlineSession")
+		void FindSession();
+
+	void JoinSession(class FOnlineSessionSearchResult _searchResult);
+
+	UFUNCTION(BlueprintCallable, Category = "OnlineSession")
+		void QuitSession();
+
 private:
 	void OnLoginCompleteDelegate(int32 _localUserNum, bool _wasSuccessful, const FUniqueNetId& _userID, const FString& _error);
 	void OnCreateSessionCompleteDelegate(FName _inSessionName, bool _wasSuccessful);
+	void OnFindSessionsCompleteDelegate(bool _wasSuccessful);
+	void OnJoinSessionCompleteDelegate(FName _sessionName, EOnJoinSessionCompleteResult::Type _result);
 };

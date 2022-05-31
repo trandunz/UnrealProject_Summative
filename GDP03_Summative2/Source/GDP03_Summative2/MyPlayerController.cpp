@@ -10,7 +10,7 @@
 #include "Kismet/GameplayStatics.h"
 
 const FName SESSION_NAME = "SessionName";
-TSharedPtr<class FOnlineSessionSearch> searchSettings;
+TSharedPtr<class FOnlineSessionSearch> SearchSettings;
 
 #define DISPLAY_LOG(fmt, ...) if (GEngine) GEngine->AddOnScreenDebugMessage(-1, 5.0f, FColor::Purple, FString::Printf(TEXT(fmt), __VA_ARGS__));
 
@@ -50,7 +50,6 @@ void AMyPlayerController::Login()
 bool AMyPlayerController::HostSession()
 {
 	IOnlineSubsystem* subSystem = Online::GetSubsystem(GetWorld());
-	bool result{false};
 
 	if (subSystem)
 	{
@@ -79,7 +78,7 @@ bool AMyPlayerController::HostSession()
 
 			TSharedPtr<const FUniqueNetId> uniqueNetIdPtr = GetLocalPlayer()->GetPreferredUniqueNetId().GetUniqueNetId();
 
-			result = session->CreateSession(*uniqueNetIdPtr, SESSION_NAME, *sessionSettings);
+			bool result = session->CreateSession(*uniqueNetIdPtr, SESSION_NAME, *sessionSettings);
 
 			if (result)
 			{
@@ -92,7 +91,77 @@ bool AMyPlayerController::HostSession()
 		}
 	}
 
-	return result;
+	return false;
+}
+
+void AMyPlayerController::FindSession()
+{
+	IOnlineSubsystem* subSystem = Online::GetSubsystem(GetWorld());
+	if (subSystem)
+	{
+		IOnlineSessionPtr session = subSystem->GetSessionInterface();
+		if (session.IsValid())
+		{
+			SearchSettings = MakeShareable(new FOnlineSessionSearch());
+
+			SearchSettings->QuerySettings.Set(SEARCH_PRESENCE, true, EOnlineComparisonOp::Equals);
+			SearchSettings->QuerySettings.Set(SEARCH_LOBBIES, true, EOnlineComparisonOp::Equals);
+			SearchSettings->QuerySettings.Set(SEARCH_KEYWORDS, FString("Custom"), EOnlineComparisonOp::Equals);
+
+			session->AddOnFindSessionsCompleteDelegate_Handle(FOnFindSessionsCompleteDelegate::CreateUObject(this, &AMyPlayerController::OnFindSessionsCompleteDelegate));
+
+			TSharedRef<FOnlineSessionSearch> searchSettingsRef = SearchSettings.ToSharedRef();
+			TSharedPtr<const FUniqueNetId> uniqueNetIdPtr = GetLocalPlayer()->GetPreferredUniqueNetId().GetUniqueNetId();
+
+			bool result = session->FindSessions(*uniqueNetIdPtr, searchSettingsRef);
+		}
+	}
+}
+
+void AMyPlayerController::JoinSession(FOnlineSessionSearchResult _searchResult)
+{
+	IOnlineSubsystem* subSystem = Online::GetSubsystem(GetWorld());
+	if (subSystem)
+	{
+		IOnlineSessionPtr session = subSystem->GetSessionInterface();
+		if (session.IsValid())
+		{
+			if (_searchResult.IsValid())
+			{
+				session->AddOnJoinSessionCompleteDelegate_Handle(FOnJoinSessionCompleteDelegate::CreateUObject(this, &AMyPlayerController::OnJoinSessionCompleteDelegate));
+
+				TSharedPtr<const FUniqueNetId> uniqueNetIdPtr = GetLocalPlayer()->GetPreferredUniqueNetId().GetUniqueNetId();
+
+				session->JoinSession(*uniqueNetIdPtr, SESSION_NAME, _searchResult);
+
+				DISPLAY_LOG("Joining Session!");
+			}
+			else
+			{
+				DISPLAY_LOG("Session Invalid!");
+			}
+		}
+	}
+}
+
+void AMyPlayerController::QuitSession()
+{
+	IOnlineSubsystem* subSystem = Online::GetSubsystem(GetWorld());
+	if (subSystem)
+	{
+		IOnlineSessionPtr session = subSystem->GetSessionInterface();
+		if (session.IsValid())
+		{
+			session->DestroySession(SESSION_NAME);
+			UGameplayStatics::OpenLevel
+			(
+				this,
+				FName(TEXT("/Game/FirstPersonCPP/Maps/FirstPersonExampleMap")),
+				true,
+				""
+			);
+		}
+	}
 }
 
 void AMyPlayerController::OnLoginCompleteDelegate(int32 _localUserNum, bool _wasSuccessful, const FUniqueNetId& _userID, const FString& _error)
@@ -131,5 +200,47 @@ void AMyPlayerController::OnCreateSessionCompleteDelegate(FName _inSessionName, 
 			true,
 			"listen"
 		);
+	}
+}
+
+void AMyPlayerController::OnFindSessionsCompleteDelegate(bool _wasSuccessful)
+{
+	if (_wasSuccessful)
+	{
+		if (SearchSettings->SearchResults.Num() == 0)
+		{
+			DISPLAY_LOG("No Sessions Found!");
+		}
+		else
+		{
+			const TCHAR* sessionID = *SearchSettings->SearchResults[0].GetSessionIdStr();
+			DISPLAY_LOG("Session Found ID: %s", *sessionID);
+			JoinSession(SearchSettings->SearchResults[0]);
+		}
+	}
+	else
+	{
+		DISPLAY_LOG("Failed To Find Sessions!")
+	}
+}
+
+void AMyPlayerController::OnJoinSessionCompleteDelegate(FName _sessionName, EOnJoinSessionCompleteResult::Type _result)
+{
+	IOnlineSubsystem* subSystem = Online::GetSubsystem(GetWorld());
+	if (subSystem)
+	{
+		IOnlineSessionPtr session = subSystem->GetSessionInterface();
+		if (session.IsValid())
+		{
+			if (_result == EOnJoinSessionCompleteResult::Success)
+			{
+				FString connectInfo;
+				if (session->GetResolvedConnectString(SESSION_NAME, connectInfo))
+				{
+					UE_LOG_ONLINE_SESSION(Log, TEXT("Joined Session!: Travelling to %s"), *connectInfo);
+					AMyPlayerController::ClientTravel(connectInfo, TRAVEL_Absolute);
+				}
+			}
+		}
 	}
 }
