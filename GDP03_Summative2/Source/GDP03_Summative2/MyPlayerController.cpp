@@ -9,7 +9,7 @@
 #include "Runtime/Engine/Classes/Engine/Engine.h"
 #include "Kismet/GameplayStatics.h"
 
-const FName SESSION_NAME = "SessionName";
+const FName SESSION_NAME = "UnrealSessionNameLeshgo";
 TSharedPtr<class FOnlineSessionSearch> SearchSettings;
 
 #define DISPLAY_LOG(fmt, ...) if (GEngine) GEngine->AddOnScreenDebugMessage(-1, 5.0f, FColor::Purple, FString::Printf(TEXT(fmt), __VA_ARGS__));
@@ -96,7 +96,7 @@ bool AMyPlayerController::HostSession()
 
 void AMyPlayerController::FindSession()
 {
-	IOnlineSubsystem* subSystem = Online::GetSubsystem(GetWorld());
+	IOnlineSubsystem* const subSystem = Online::GetSubsystem(GetWorld());
 	if (subSystem)
 	{
 		IOnlineSessionPtr session = subSystem->GetSessionInterface();
@@ -108,12 +108,15 @@ void AMyPlayerController::FindSession()
 			SearchSettings->QuerySettings.Set(SEARCH_LOBBIES, true, EOnlineComparisonOp::Equals);
 			SearchSettings->QuerySettings.Set(SEARCH_KEYWORDS, FString("Custom"), EOnlineComparisonOp::Equals);
 
-			session->AddOnFindSessionsCompleteDelegate_Handle(FOnFindSessionsCompleteDelegate::CreateUObject(this, &AMyPlayerController::OnFindSessionsCompleteDelegate));
+			session->AddOnFindSessionsCompleteDelegate_Handle
+			(
+				FOnFindSessionsCompleteDelegate::CreateUObject(this, &AMyPlayerController::OnFindSessionsCompleteDelegate)
+			);
 
 			TSharedRef<FOnlineSessionSearch> searchSettingsRef = SearchSettings.ToSharedRef();
 			TSharedPtr<const FUniqueNetId> uniqueNetIdPtr = GetLocalPlayer()->GetPreferredUniqueNetId().GetUniqueNetId();
 
-			bool result = session->FindSessions(*uniqueNetIdPtr, searchSettingsRef);
+			bool wasSuccessful = session->FindSessions(*uniqueNetIdPtr, searchSettingsRef);
 		}
 	}
 }
@@ -213,8 +216,9 @@ void AMyPlayerController::OnFindSessionsCompleteDelegate(bool _wasSuccessful)
 		}
 		else
 		{
-			const TCHAR* sessionID = *SearchSettings->SearchResults[0].GetSessionIdStr();
-			DISPLAY_LOG("Session Found ID: %s", *sessionID);
+			//FString sessionId = SearchSettings->SearchResults[0].GetSessionIdStr();
+
+			//DISPLAY_LOG("Session Found ID: %s", TCHAR_TO_ANSI(*sessionId));
 			JoinSession(SearchSettings->SearchResults[0]);
 		}
 	}
@@ -226,7 +230,7 @@ void AMyPlayerController::OnFindSessionsCompleteDelegate(bool _wasSuccessful)
 
 void AMyPlayerController::OnJoinSessionCompleteDelegate(FName _sessionName, EOnJoinSessionCompleteResult::Type _result)
 {
-	IOnlineSubsystem* subSystem = Online::GetSubsystem(GetWorld());
+	IOnlineSubsystem* const subSystem = Online::GetSubsystem(GetWorld());
 	if (subSystem)
 	{
 		IOnlineSessionPtr session = subSystem->GetSessionInterface();
