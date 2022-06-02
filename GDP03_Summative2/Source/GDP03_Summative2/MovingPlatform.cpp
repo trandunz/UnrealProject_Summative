@@ -41,3 +41,4 @@ void AMovingPlatform::Tick(float DeltaTime)
 	SetActorLocation(location);
 }
 
+

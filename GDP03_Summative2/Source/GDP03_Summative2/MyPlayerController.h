@@ -23,19 +23,24 @@ public:
 		void Login();
 
 	UFUNCTION(BlueprintCallable, Category = "OnlineSession")
-		bool HostSession();
+		bool HostSession(bool _lan);
 
 	UFUNCTION(BlueprintCallable, Category = "OnlineSession")
-		void FindSession();
+		bool FindSession(bool _lan);
 
-	void JoinSession(class FOnlineSessionSearchResult _searchResult);
+	UFUNCTION(BlueprintCallable, Category = "OnlineSession")
+		bool JoinSession(bool _lan);
 
 	UFUNCTION(BlueprintCallable, Category = "OnlineSession")
 		void QuitSession();
 
 private:
+	void JoinSession(class FOnlineSessionSearchResult _searchResult, bool _lan);
+
 	void OnLoginCompleteDelegate(int32 _localUserNum, bool _wasSuccessful, const FUniqueNetId& _userID, const FString& _error);
 	void OnCreateSessionCompleteDelegate(FName _inSessionName, bool _wasSuccessful);
 	void OnFindSessionsCompleteDelegate(bool _wasSuccessful);
 	void OnJoinSessionCompleteDelegate(FName _sessionName, EOnJoinSessionCompleteResult::Type _result);
+
+	bool IsLAN{ false };
 };

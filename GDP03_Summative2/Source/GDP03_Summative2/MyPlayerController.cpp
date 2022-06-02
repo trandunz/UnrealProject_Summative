@@ -47,9 +47,13 @@ void AMyPlayerController::Login()
 	}
 }
 
-bool AMyPlayerController::HostSession()
+bool AMyPlayerController::HostSession(bool _lan)
 {
-	IOnlineSubsystem* subSystem = Online::GetSubsystem(GetWorld());
+	IOnlineSubsystem* subSystem;
+		if (_lan) 
+			subSystem = Online::GetSubsystem(GetWorld(), NULL_SUBSYSTEM);
+		else
+			subSystem = Online::GetSubsystem(GetWorld());
 
 	if (subSystem)
 	{
@@ -61,6 +65,9 @@ bool AMyPlayerController::HostSession()
 
 			sessionSettings->NumPrivateConnections = 6;
 			sessionSettings->NumPublicConnections = 4;
+
+			if (_lan)
+				sessionSettings->bIsLANMatch = true;
 
 			sessionSettings->bShouldAdvertise = true;
 			sessionSettings->bAllowJoinInProgress = true;
@@ -94,9 +101,20 @@ bool AMyPlayerController::HostSession()
 	return false;
 }
 
-void AMyPlayerController::FindSession()
+bool AMyPlayerController::FindSession(bool _lan)
 {
-	IOnlineSubsystem* const subSystem = Online::GetSubsystem(GetWorld());
+	IOnlineSubsystem* subSystem;
+	if (_lan)
+	{
+		IsLAN = true;
+		subSystem = Online::GetSubsystem(GetWorld(), NULL_SUBSYSTEM);
+	}
+	else
+	{
+		IsLAN = false;
+		subSystem = Online::GetSubsystem(GetWorld());
+	}
+
 	if (subSystem)
 	{
 		IOnlineSessionPtr session = subSystem->GetSessionInterface();
@@ -116,14 +134,34 @@ void AMyPlayerController::FindSession()
 			TSharedRef<FOnlineSessionSearch> searchSettingsRef = SearchSettings.ToSharedRef();
 			TSharedPtr<const FUniqueNetId> uniqueNetIdPtr = GetLocalPlayer()->GetPreferredUniqueNetId().GetUniqueNetId();
 
-			bool wasSuccessful = session->FindSessions(*uniqueNetIdPtr, searchSettingsRef);
+			return session->FindSessions(*uniqueNetIdPtr, searchSettingsRef);
 		}
 	}
+	return false;
 }
 
-void AMyPlayerController::JoinSession(FOnlineSessionSearchResult _searchResult)
+bool AMyPlayerController::JoinSession(bool _lan)
 {
-	IOnlineSubsystem* subSystem = Online::GetSubsystem(GetWorld());
+	if (SearchSettings->SearchResults.Num() > 0)
+	{
+		if (_lan)
+			JoinSession(SearchSettings->SearchResults[0], true);
+		else
+			JoinSession(SearchSettings->SearchResults[0], false);
+		
+		return true;
+	}
+	return false;
+}
+
+void AMyPlayerController::JoinSession(FOnlineSessionSearchResult _searchResult, bool _lan)
+{
+	IOnlineSubsystem* subSystem;
+	if (_lan)
+		subSystem = Online::GetSubsystem(GetWorld(), NULL_SUBSYSTEM);
+	else
+		subSystem = Online::GetSubsystem(GetWorld());
+
 	if (subSystem)
 	{
 		IOnlineSessionPtr session = subSystem->GetSessionInterface();
@@ -216,10 +254,7 @@ void AMyPlayerController::OnFindSessionsCompleteDelegate(bool _wasSuccessful)
 		}
 		else
 		{
-			//FString sessionId = SearchSettings->SearchResults[0].GetSessionIdStr();
-
-			//DISPLAY_LOG("Session Found ID: %s", TCHAR_TO_ANSI(*sessionId));
-			JoinSession(SearchSettings->SearchResults[0]);
+			DISPLAY_LOG("Session Found!");
 		}
 	}
 	else
@@ -230,7 +265,12 @@ void AMyPlayerController::OnFindSessionsCompleteDelegate(bool _wasSuccessful)
 
 void AMyPlayerController::OnJoinSessionCompleteDelegate(FName _sessionName, EOnJoinSessionCompleteResult::Type _result)
 {
-	IOnlineSubsystem* const subSystem = Online::GetSubsystem(GetWorld());
+	IOnlineSubsystem* subSystem;
+	if (IsLAN)
+		subSystem = Online::GetSubsystem(GetWorld(), NULL_SUBSYSTEM);
+	else
+		subSystem = Online::GetSubsystem(GetWorld());
+
 	if (subSystem)
 	{
 		IOnlineSessionPtr session = subSystem->GetSessionInterface();

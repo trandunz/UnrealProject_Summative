@@ -21,6 +21,7 @@ DEFINE_LOG_CATEGORY_STATIC(LogFPChar, Warning, All);
 AGDP03_Summative2Character::AGDP03_Summative2Character()
 {
 	CurrentHealth = 100;
+	CurrentObjective = "Retrieve Ball";
 
 	// Set size for collision capsule
 	GetCapsuleComponent()->InitCapsuleSize(55.f, 96.0f);
@@ -204,9 +205,14 @@ void AGDP03_Summative2Character::GetLifetimeReplicatedProps(TArray<FLifetimeProp
 	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
 
 	DOREPLIFETIME(AGDP03_Summative2Character, CurrentHealth);
+	DOREPLIFETIME(AGDP03_Summative2Character, CurrentObjective);
 }
 
 void AGDP03_Summative2Character::OnRep_CurrentHealth()
+{
+}
+
+void AGDP03_Summative2Character::OnRep_CurrentObjective()
 {
 }
 

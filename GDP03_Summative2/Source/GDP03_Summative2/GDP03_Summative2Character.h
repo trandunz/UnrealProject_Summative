@@ -89,6 +89,9 @@ public:
 	UPROPERTY(ReplicatedUsing = OnRep_CurrentHealth, EditAnywhere, BlueprintReadWrite)
 		float CurrentHealth;
 
+	UPROPERTY(ReplicatedUsing = OnRep_CurrentObjective, EditAnywhere, BlueprintReadWrite)
+		FString CurrentObjective;
+
 protected:
 	
 	/** Fires a projectile. */
@@ -99,6 +102,9 @@ protected:
 
 	UFUNCTION()
 		void OnRep_CurrentHealth();
+
+	UFUNCTION()
+		void OnRep_CurrentObjective();
 
 	/** Resets HMD orientation and position in VR. */
 	void OnResetVR();

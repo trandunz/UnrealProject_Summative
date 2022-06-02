@@ -29,6 +29,7 @@ public:
 		float MoveSpeed;
 
 private:
+
 	FVector m_StartLocation;
 	int m_MoveDirection;
 };
