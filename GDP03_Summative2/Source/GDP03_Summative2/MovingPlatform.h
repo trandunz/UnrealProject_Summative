@@ -11,6 +11,9 @@ class GDP03_SUMMATIVE2_API AMovingPlatform : public AActor
 {
 	GENERATED_BODY()
 	
+	FVector m_StartLocation;
+	int m_MoveDirection;
+
 public:	
 	// Sets default values for this actor's properties
 	AMovingPlatform();
@@ -23,13 +26,10 @@ public:
 	// Called every frame
 	virtual void Tick(float DeltaTime) override;
 
+	void Movement();
+
 	UPROPERTY(EditAnywhere)
 		UStaticMeshComponent* Mesh;
 	UPROPERTY(EditAnywhere)
 		float MoveSpeed;
-
-private:
-
-	FVector m_StartLocation;
-	int m_MoveDirection;
 };

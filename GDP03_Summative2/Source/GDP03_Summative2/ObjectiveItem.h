@@ -6,17 +6,12 @@
 #include "GameFramework/Actor.h"
 #include "ObjectiveItem.generated.h"
 
-
-
 UCLASS()
 class GDP03_SUMMATIVE2_API AObjectiveItem : public AActor
 {
 	GENERATED_BODY()
 	
 public:	
-
-	DECLARE_EVENT(AObjectiveItem, FObjectiveItemEvent)
-	FObjectiveItemEvent TriggerOverlapBeginEvent;
 
 	// Sets default values for this actor's properties
 	AObjectiveItem();
@@ -36,9 +31,6 @@ public:
 		int32 OtherBodyIndex,
 		bool bFromSweep,
 		const FHitResult& SweepResult);
-
-	UFUNCTION()
-		virtual void TriggerCallbackOn(AActor* OtherActor);
 
 	void Orbit();
 

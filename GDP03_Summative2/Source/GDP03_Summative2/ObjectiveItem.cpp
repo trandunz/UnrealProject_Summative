@@ -3,6 +3,7 @@
 
 #include "ObjectiveItem.h"
 #include "Components/BoxComponent.h"
+#include "Components/StaticMeshComponent.h"
 #include "GDP03_Summative2Character.h"
 
 #define DISPLAY_LOG(fmt, ...) if (GEngine) GEngine->AddOnScreenDebugMessage(-1, 5.0f, FColor::Purple, FString::Printf(TEXT(fmt), __VA_ARGS__));
@@ -10,6 +11,11 @@
 // Sets default values
 AObjectiveItem::AObjectiveItem()
 {
+	if (HasAuthority())
+	{
+		bReplicates = true;
+		SetReplicatingMovement(true);
+	}
  	// Set this actor to call Tick() every frame.  You can turn this off to improve performance if you don't need it.
 	PrimaryActorTick.bCanEverTick = true;
 
@@ -17,15 +23,14 @@ AObjectiveItem::AObjectiveItem()
 	Range = 5.0f;
 
 	Mesh = CreateDefaultSubobject<class UStaticMeshComponent>(TEXT("Mesh"));
-	Mesh->AttachTo(RootComponent);
+	Mesh->SetupAttachment(RootComponent);
 
 	TriggerCollider = CreateDefaultSubobject<class UBoxComponent>(TEXT("Trigger"));
 	TriggerCollider->SetBoxExtent(FVector(50.0f));
 	TriggerCollider->SetGenerateOverlapEvents(true);
 
-	TriggerCollider->AttachTo(Mesh);
+	TriggerCollider->SetupAttachment(RootComponent);
 	TriggerCollider->SetHiddenInGame(true);
-
 }
 
 // Called when the game starts or when spawned
@@ -44,7 +49,11 @@ void AObjectiveItem::BeginPlay()
 void AObjectiveItem::Tick(float DeltaTime)
 {
 	Super::Tick(DeltaTime);
-	Orbit();
+
+	if (HasAuthority())
+	{
+		Orbit();
+	}
 }
 
 void AObjectiveItem::HandleOverlap(UPrimitiveComponent* OverlappedComp,
@@ -53,15 +62,6 @@ void AObjectiveItem::HandleOverlap(UPrimitiveComponent* OverlappedComp,
 	int32 OtherBodyIndex,
 	bool bFromSweep,
 	const FHitResult& SweepResult)
-{
-	if (OtherActor && (OtherActor != this))
-	{
-		TriggerOverlapBeginEvent.Broadcast();
-		TriggerCallbackOn(OtherActor);
-	}
-}
-
-void AObjectiveItem::TriggerCallbackOn(AActor* OtherActor)
 {
 	AGDP03_Summative2Character* playerCharacter = Cast< AGDP03_Summative2Character>(OtherActor);
 
