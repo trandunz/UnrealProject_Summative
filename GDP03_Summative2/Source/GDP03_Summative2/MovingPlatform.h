@@ -14,6 +14,7 @@ class GDP03_SUMMATIVE2_API AMovingPlatform : public AActor
 	FVector m_StartLocation;
 	int m_MoveDirection;
 
+
 public:	
 	// Sets default values for this actor's properties
 	AMovingPlatform();
@@ -32,4 +33,7 @@ public:
 		UStaticMeshComponent* Mesh;
 	UPROPERTY(EditAnywhere)
 		float MoveSpeed;
+
+	UPROPERTY(EditAnywhere)
+		FVector m_MoveAxis;
 };

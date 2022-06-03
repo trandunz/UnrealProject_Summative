@@ -10,6 +10,12 @@ UCLASS()
 class GDP03_SUMMATIVE2_API AObjectiveItem : public AActor
 {
 	GENERATED_BODY()
+
+	FVector m_StartLocation;
+	int m_MoveDirection;
+
+	void Orbit();
+	void Bounce();
 	
 public:	
 
@@ -31,8 +37,6 @@ public:
 		int32 OtherBodyIndex,
 		bool bFromSweep,
 		const FHitResult& SweepResult);
-
-	void Orbit();
 
 	UPROPERTY(VisibleAnywhere)
 		UStaticMeshComponent* Mesh;

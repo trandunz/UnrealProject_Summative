@@ -11,19 +11,13 @@
 // Sets default values
 AObjectiveItem::AObjectiveItem()
 {
-	if (HasAuthority())
-	{
-		bReplicates = true;
-		SetReplicatingMovement(true);
-	}
+	
  	// Set this actor to call Tick() every frame.  You can turn this off to improve performance if you don't need it.
 	PrimaryActorTick.bCanEverTick = true;
 
-	MoveSpeed = 1.0f;
-	Range = 5.0f;
-
 	Mesh = CreateDefaultSubobject<class UStaticMeshComponent>(TEXT("Mesh"));
 	Mesh->SetupAttachment(RootComponent);
+	Mesh->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 
 	TriggerCollider = CreateDefaultSubobject<class UBoxComponent>(TEXT("Trigger"));
 	TriggerCollider->SetBoxExtent(FVector(50.0f));
@@ -31,12 +25,25 @@ AObjectiveItem::AObjectiveItem()
 
 	TriggerCollider->SetupAttachment(RootComponent);
 	TriggerCollider->SetHiddenInGame(true);
+
+	if (HasAuthority())
+	{
+		bReplicates = true;
+		SetReplicatingMovement(true);
+		Mesh->SetIsReplicated(true);
+		TriggerCollider->SetIsReplicated(true);
+	}
 }
 
 // Called when the game starts or when spawned
 void AObjectiveItem::BeginPlay()
 {
 	Super::BeginPlay();
+
+	m_StartLocation = GetActorLocation();
+	m_MoveDirection = 1;
+	MoveSpeed = 1.0f;
+	Range = 5.0f;
 
 	TriggerCollider->OnComponentBeginOverlap.RemoveDynamic(
 		this, &AObjectiveItem::HandleOverlap);
@@ -52,7 +59,7 @@ void AObjectiveItem::Tick(float DeltaTime)
 
 	if (HasAuthority())
 	{
-		Orbit();
+		Bounce();
 	}
 }
 
@@ -77,7 +84,19 @@ void AObjectiveItem::HandleOverlap(UPrimitiveComponent* OverlappedComp,
 
 void AObjectiveItem::Orbit()
 {
-	SetActorLocation(GetActorLocation() + (MoveSpeed * GetActorRightVector() * Range));
+	SetActorRelativeLocation(GetActorLocation() + (MoveSpeed * GetActorRightVector() * Range));
 	SetActorRelativeRotation(GetActorRotation() + FRotator(0, MoveSpeed, 0));
+}
+
+void AObjectiveItem::Bounce()
+{
+	FVector location = GetActorLocation();
+
+	if (location.Z < m_StartLocation.Z - 100 || location.Z > m_StartLocation.Z + 100)
+		m_MoveDirection *= -1;
+
+	location.Z += m_MoveDirection * MoveSpeed;
+
+	SetActorLocation(location);
 }
 
