@@ -9,11 +9,13 @@
 #include "GameFramework/InputSettings.h"
 #include "HeadMountedDisplayFunctionLibrary.h"
 #include "Kismet/GameplayStatics.h"
+#include "MyPlayerController.h"
 #include "MotionControllerComponent.h"
 #include "XRMotionControllerBase.h" // for FXRMotionControllerBase::RightHandSourceId
 #include "Net/UnrealNetwork.h"
 
 DEFINE_LOG_CATEGORY_STATIC(LogFPChar, Warning, All);
+#define DISPLAY_LOG(fmt, ...) if (GEngine) GEngine->AddOnScreenDebugMessage(-1, 5.0f, FColor::Purple, FString::Printf(TEXT(fmt), __VA_ARGS__));
 
 //////////////////////////////////////////////////////////////////////////
 // AGDP03_Summative2Character
@@ -208,8 +210,28 @@ void AGDP03_Summative2Character::GetLifetimeReplicatedProps(TArray<FLifetimeProp
 	DOREPLIFETIME(AGDP03_Summative2Character, CurrentObjective);
 }
 
+void AGDP03_Summative2Character::MultiCastOnPlayerDeath_Implementation(APawn* _instigatorPawn)
+{
+	for (auto it = GetWorld()->GetPlayerControllerIterator(); it; it++)
+	{
+		APlayerController* controller = Cast<APlayerController>(it->Get());
+		if (controller && controller->IsLocalController())
+		{
+			APawn* pawn = controller->GetPawn();
+			if (pawn)
+			{
+				pawn->DisableInput(controller);
+			}
+		}
+	}
+}
+
 void AGDP03_Summative2Character::OnRep_CurrentHealth()
 {
+	if (CurrentHealth <= 0)
+	{
+		//MultiCastOnPlayerDeath(GetController()->GetPawn());
+	}
 }
 
 void AGDP03_Summative2Character::OnRep_CurrentObjective()

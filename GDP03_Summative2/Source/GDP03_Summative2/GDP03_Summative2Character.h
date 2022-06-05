@@ -51,6 +51,8 @@ class AGDP03_Summative2Character : public ACharacter
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, meta = (AllowPrivateAccess = "true"))
 	UMotionControllerComponent* L_MotionController;
 
+	bool EnableInput = true;
+
 public:
 	AGDP03_Summative2Character();
 
@@ -99,6 +101,9 @@ protected:
 
 	UFUNCTION(Server, Reliable, WithValidation)
 		void Server_OnFire();
+
+	UFUNCTION(NetMultiCast, Reliable)
+		void MultiCastOnPlayerDeath(APawn* _instigatorPawn);
 
 	UFUNCTION()
 		void OnRep_CurrentHealth();

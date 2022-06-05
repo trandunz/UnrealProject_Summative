@@ -32,8 +32,11 @@ AGDP03_Summative2Projectile::AGDP03_Summative2Projectile()
 	// Die after 3 seconds by default
 	InitialLifeSpan = 3.0f;
 
-	bReplicates = true;
-	SetReplicateMovement(true);
+	if (HasAuthority())
+	{
+		bReplicates = true;
+		SetReplicateMovement(true);
+	}
 }
 
 void AGDP03_Summative2Projectile::OnHit(UPrimitiveComponent* HitComp, AActor* OtherActor, UPrimitiveComponent* OtherComp, FVector NormalImpulse, const FHitResult& Hit)
@@ -47,7 +50,8 @@ void AGDP03_Summative2Projectile::OnHit(UPrimitiveComponent* HitComp, AActor* Ot
 		{
 			if (GetLocalRole() == ROLE_Authority)
 			{
-				mCharacter->CurrentHealth -= 10;
+				if (mCharacter->CurrentHealth > 0)
+					mCharacter->CurrentHealth -= 10;
 			}
 		}
 
