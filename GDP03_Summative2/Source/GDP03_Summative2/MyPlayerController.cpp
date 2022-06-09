@@ -120,6 +120,10 @@ bool AMyPlayerController::FindSession(bool _lan)
 		IOnlineSessionPtr session = subSystem->GetSessionInterface();
 		if (session.IsValid())
 		{
+			if (SearchSettings.IsValid())
+			{
+				SearchSettings.Reset();
+			}
 			SearchSettings = MakeShareable(new FOnlineSessionSearch());
 
 			SearchSettings->QuerySettings.Set(SEARCH_PRESENCE, true, EOnlineComparisonOp::Equals);
@@ -197,7 +201,7 @@ void AMyPlayerController::QuitSession()
 			UGameplayStatics::OpenLevel
 			(
 				this,
-				FName(TEXT("/Game/FirstPersonCPP/Maps/FirstPersonExampleMap")),
+				FName(TEXT("/Game/FirstPersonCPP/Maps/MainMenu")),
 				true,
 				""
 			);

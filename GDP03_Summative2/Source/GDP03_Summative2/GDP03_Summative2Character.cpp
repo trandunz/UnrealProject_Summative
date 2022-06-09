@@ -24,6 +24,8 @@ AGDP03_Summative2Character::AGDP03_Summative2Character()
 {
 	CurrentHealth = 100;
 	CurrentObjective = "Retrieve Ball";
+	HasWon = false;
+	IsGameOver = false;
 
 	// Set size for collision capsule
 	GetCapsuleComponent()->InitCapsuleSize(55.f, 96.0f);
@@ -144,9 +146,28 @@ void AGDP03_Summative2Character::SetupPlayerInputComponent(class UInputComponent
 	PlayerInputComponent->BindAxis("LookUpRate", this, &AGDP03_Summative2Character::LookUpAtRate);
 }
 
+void AGDP03_Summative2Character::Tick(float _deltaTime)
+{
+	Super::Tick(_deltaTime);
+
+	if (CurrentHealth <= 0)
+	{
+		HasWon = false;
+
+		if (!IsGameOver)
+		{
+			Server_DisableInput();
+			Server_PlayerDeath();
+			IsGameOver = true;
+		}
+		
+	}
+}
+
 void AGDP03_Summative2Character::OnFire()
 {
 	Server_OnFire();
+	
 
 	// try and play the sound if specified
 	if (FireSound != nullptr)
@@ -166,8 +187,15 @@ void AGDP03_Summative2Character::OnFire()
 	}
 }
 
+void AGDP03_Summative2Character::EndTheGame(bool _hasWon)
+{
+	HasWon = _hasWon;
+	Server_DisableInput();
+}
+
 void AGDP03_Summative2Character::Server_OnFire_Implementation()
 {
+	
 	// try and fire a projectile
 	if (ProjectileClass != nullptr)
 	{
@@ -197,7 +225,28 @@ void AGDP03_Summative2Character::Server_OnFire_Implementation()
 	}
 }
 
+
 bool AGDP03_Summative2Character::Server_OnFire_Validate()
+{
+	return true;
+}
+
+void AGDP03_Summative2Character::Server_DisableInput_Implementation()
+{
+	MultiCast_DisableInput();
+}
+
+bool AGDP03_Summative2Character::Server_DisableInput_Validate()
+{
+	return true;
+}
+
+void AGDP03_Summative2Character::Server_PlayerDeath_Implementation()
+{
+	MultiCast_PlayerDeath();
+}
+
+bool AGDP03_Summative2Character::Server_PlayerDeath_Validate()
 {
 	return true;
 }
@@ -208,12 +257,20 @@ void AGDP03_Summative2Character::GetLifetimeReplicatedProps(TArray<FLifetimeProp
 
 	DOREPLIFETIME(AGDP03_Summative2Character, CurrentHealth);
 	DOREPLIFETIME(AGDP03_Summative2Character, CurrentObjective);
+	DOREPLIFETIME(AGDP03_Summative2Character, HasWon);
+	DOREPLIFETIME(AGDP03_Summative2Character, IsGameOver);
 }
 
-void AGDP03_Summative2Character::MultiCastOnPlayerDeath_Implementation(APawn* _instigatorPawn)
+void AGDP03_Summative2Character::MultiCast_DisableInput_Implementation()
 {
 	for (auto it = GetWorld()->GetPlayerControllerIterator(); it; it++)
 	{
+		AGDP03_Summative2Character* character = Cast<AGDP03_Summative2Character>(it->Get()->GetCharacter());
+		if (character && character->GetController()->IsLocalController())
+		{
+			character->IsGameOver = true;
+		}
+
 		APlayerController* controller = Cast<APlayerController>(it->Get());
 		if (controller && controller->IsLocalController())
 		{
@@ -226,15 +283,41 @@ void AGDP03_Summative2Character::MultiCastOnPlayerDeath_Implementation(APawn* _i
 	}
 }
 
-void AGDP03_Summative2Character::OnRep_CurrentHealth()
+bool AGDP03_Summative2Character::MultiCast_DisableInput_Validate()
 {
-	if (CurrentHealth <= 0)
+	return true;
+}
+
+void AGDP03_Summative2Character::MultiCast_PlayerDeath_Implementation()
+{
+	for (auto it = GetWorld()->GetPlayerControllerIterator(); it; it++)
 	{
-		//MultiCastOnPlayerDeath(GetController()->GetPawn());
+		AGDP03_Summative2Character* character = Cast<AGDP03_Summative2Character>(it->Get()->GetCharacter());
+		if (character && character->GetController()->IsLocalController())
+		{
+			character->HasWon = true;
+		}
 	}
 }
 
+bool AGDP03_Summative2Character::MultiCast_PlayerDeath_Validate()
+{
+	return true;
+}
+
+void AGDP03_Summative2Character::OnRep_CurrentHealth()
+{
+}
+
 void AGDP03_Summative2Character::OnRep_CurrentObjective()
+{
+}
+
+void AGDP03_Summative2Character::OnRep_HasWon()
+{
+}
+
+void AGDP03_Summative2Character::OnRep_IsGameOver()
 {
 }
 

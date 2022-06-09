@@ -54,8 +54,6 @@ void AGDP03_Summative2Projectile::OnHit(UPrimitiveComponent* HitComp, AActor* Ot
 					mCharacter->CurrentHealth -= 10;
 			}
 		}
-
-		
 	}
 	Destroy();
 }

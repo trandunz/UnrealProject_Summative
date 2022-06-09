@@ -94,22 +94,48 @@ public:
 	UPROPERTY(ReplicatedUsing = OnRep_CurrentObjective, EditAnywhere, BlueprintReadWrite)
 		FString CurrentObjective;
 
+	UPROPERTY(ReplicatedUsing = OnRep_HasWon, EditAnywhere, BlueprintReadWrite)
+		bool HasWon;
+
+	UPROPERTY(ReplicatedUsing = OnRep_IsGameOver, EditAnywhere, BlueprintReadWrite)
+		bool IsGameOver;
+
+	UFUNCTION()
+		void EndTheGame(bool _hasWon);
+
 protected:
 	
+	virtual void Tick(float _deltaTime);
+
 	/** Fires a projectile. */
 	void OnFire();
 
 	UFUNCTION(Server, Reliable, WithValidation)
 		void Server_OnFire();
 
-	UFUNCTION(NetMultiCast, Reliable)
-		void MultiCastOnPlayerDeath(APawn* _instigatorPawn);
+	UFUNCTION(Server, Reliable, WithValidation)
+		void Server_DisableInput();
+
+	UFUNCTION(Server, Reliable, WithValidation)
+		void Server_PlayerDeath();
+
+	UFUNCTION(NetMultiCast, Reliable, WithValidation)
+		void MultiCast_DisableInput();
+
+	UFUNCTION(NetMultiCast, Reliable, WithValidation)
+		void MultiCast_PlayerDeath();
 
 	UFUNCTION()
 		void OnRep_CurrentHealth();
 
 	UFUNCTION()
 		void OnRep_CurrentObjective();
+
+	UFUNCTION()
+		void OnRep_HasWon();
+
+	UFUNCTION()
+		void OnRep_IsGameOver();
 
 	/** Resets HMD orientation and position in VR. */
 	void OnResetVR();

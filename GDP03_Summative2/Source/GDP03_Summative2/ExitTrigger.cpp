@@ -24,13 +24,13 @@ void AExitTrigger::OnOverlapBegin(AActor* _overlapActor, AActor* _otherActor)
 {
 	if (_otherActor && _otherActor != this)
 	{
-		DISPLAY_LOG("Overlap Begin");
 		AGDP03_Summative2Character* charactor = Cast< AGDP03_Summative2Character>(_otherActor);
 		if (charactor)
 		{
 			if (charactor->CurrentObjective == "Get To Exit")
 			{
 				charactor->CurrentObjective = "You Win!";
+				charactor->EndTheGame(true);
 			}
 		}
 	}
