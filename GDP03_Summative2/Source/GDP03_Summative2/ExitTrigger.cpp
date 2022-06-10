@@ -3,6 +3,7 @@
 
 #include "ExitTrigger.h"
 #include "DrawDebugHelpers.h"
+#include "GDP03_Summative2GameMode.h"
 #include "GDP03_Summative2Character.h"
 
 #define DISPLAY_LOG(fmt, ...) if (GEngine) GEngine->AddOnScreenDebugMessage(-1, 5.0f, FColor::Purple, FString::Printf(TEXT(fmt), __VA_ARGS__));
@@ -30,7 +31,11 @@ void AExitTrigger::OnOverlapBegin(AActor* _overlapActor, AActor* _otherActor)
 			if (charactor->CurrentObjective == "Get To Exit")
 			{
 				charactor->CurrentObjective = "You Win!";
-				charactor->EndTheGame(true);
+				AGDP03_Summative2GameMode* gameMode = Cast< AGDP03_Summative2GameMode>(GetWorld()->GetAuthGameMode());
+				if (gameMode)
+				{
+					gameMode->OnMissionComplete(charactor->GetController()->GetPawn());
+				}
 			}
 		}
 	}

@@ -29,7 +29,6 @@ AObjectiveItem::AObjectiveItem()
 	if (HasAuthority())
 	{
 		bReplicates = true;
-		SetReplicatingMovement(true);
 		Mesh->SetIsReplicated(true);
 		TriggerCollider->SetIsReplicated(true);
 	}
@@ -68,7 +67,7 @@ void AObjectiveItem::Tick(float DeltaTime)
 {
 	Super::Tick(DeltaTime);
 
-	if (HasAuthority())
+	if (GetLocalRole() == ROLE_AutonomousProxy)
 	{
 		m_ElapsedTime += DeltaTime;
 
@@ -78,17 +77,23 @@ void AObjectiveItem::Tick(float DeltaTime)
 		move.movementValue = MoveSpeed;
 		move.movementAmplitude = Amplitude;
 
-		FVector newLocation = SimulateMove(move);
-		AddActorWorldOffset(newLocation * move.deltaTime);
+		SimulateMove(move);
 
-		serverState.currentMove = move;
-		serverState.transform = GetActorTransform();
+		AddMove(move);
 
-		if (GetActorLocation().Z > m_StartLocation.Z + 50
-			|| GetActorLocation().Z < m_StartLocation.Z - 50)
-		{
-			Amplitude *= -1;
-		}
+		Server_SendMove(move);
+	}
+	if (HasAuthority() && IsLocallyControlled())
+	{
+		m_ElapsedTime += DeltaTime;
+
+		FMove move;
+		move.time = m_ElapsedTime;
+		move.deltaTime = DeltaTime;
+		move.movementValue = MoveSpeed;
+		move.movementAmplitude = Amplitude;
+
+		Server_SendMove(move);
 	}
 	if (GetLocalRole() == ROLE_SimulatedProxy)
 	{
@@ -131,13 +136,24 @@ void AObjectiveItem::HandleOverlap(UPrimitiveComponent* OverlappedComp,
 	}
 }
 
+void AObjectiveItem::AddMove(FMove _move)
+{
+	int size = sizeof(Moves) / sizeof(FMove);
+	Moves[(size + 1) % 5] = _move;
+}
+
 FVector AObjectiveItem::SimulateMove(FMove move)
 {
-	return FVector(0,0,move.movementAmplitude * move.movementValue);
+	return FVector(0,0, move.movementAmplitude * cosf(move.time * move.movementValue));
 }
 
 void AObjectiveItem::Server_SendMove_Implementation(FMove _move)
 {
+	FVector newLocation = SimulateMove(_move);
+	AddActorWorldOffset(newLocation * _move.deltaTime);
+
+	serverState.currentMove = _move;
+	serverState.transform = GetActorTransform();
 }
 
 void AObjectiveItem::OnRep_ServerState()
@@ -163,7 +179,27 @@ void AObjectiveItem::SimulatedProxy_OnRep_ServerState()
 
 void AObjectiveItem::AutonomousProxy_OnRep_ServerState()
 {
-	
+	SetActorTransform(serverState.transform);
+
+	int sizeOfMoves = sizeof(Moves) / sizeof(FMove);
+	int location = 0;
+	for (int i = 0; i < sizeOfMoves; i++)
+	{
+		if (SimulateMove(Moves[i]) == SimulateMove(serverState.currentMove))
+		{
+			break;
+		}
+		else
+		{
+			location++;
+			Moves[i] = FMove();
+		}
+	}
+
+	for (int i = location; i < sizeOfMoves; i++)
+	{
+		SetActorLocation(SimulateMove(Moves[i]));
+	}
 }
 
 bool AObjectiveItem::IsLocallyControlled()

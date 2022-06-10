@@ -13,16 +13,14 @@ class AGDP03_Summative2GameMode : public AGameModeBase
 
 public:
 
-	virtual void Tick(float _DeltaTime) override;
-
-	virtual void BeginPlay() override;
-
 	AGDP03_Summative2GameMode();
+
+	UFUNCTION()
+		void OnMissionComplete(APawn* _intigatorPawn);
 
 protected:
 
-	UFUNCTION(NetMultiCast, Reliable, WithValidation)
-		void MultiCast_DisableInput();
+	
 };
 
 
