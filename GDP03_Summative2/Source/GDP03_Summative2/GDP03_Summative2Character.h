@@ -114,13 +114,7 @@ protected:
 		void Server_OnFire();
 
 	UFUNCTION(Server, Reliable, WithValidation)
-		void Server_DisableInput();
-
-	UFUNCTION(Server, Reliable, WithValidation)
 		void Server_PlayerDeath();
-
-	UFUNCTION(NetMultiCast, Reliable, WithValidation)
-		void MultiCast_DisableInput();
 
 	UFUNCTION(NetMultiCast, Reliable, WithValidation)
 		void MultiCast_PlayerDeath();

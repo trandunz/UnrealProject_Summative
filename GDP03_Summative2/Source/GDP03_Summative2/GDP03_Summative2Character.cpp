@@ -149,19 +149,6 @@ void AGDP03_Summative2Character::SetupPlayerInputComponent(class UInputComponent
 void AGDP03_Summative2Character::Tick(float _deltaTime)
 {
 	Super::Tick(_deltaTime);
-
-	if (CurrentHealth <= 0)
-	{
-		HasWon = false;
-
-		if (!IsGameOver)
-		{
-			Server_DisableInput();
-			Server_PlayerDeath();
-			IsGameOver = true;
-		}
-		
-	}
 }
 
 void AGDP03_Summative2Character::OnFire()
@@ -189,8 +176,8 @@ void AGDP03_Summative2Character::OnFire()
 
 void AGDP03_Summative2Character::EndTheGame(bool _hasWon)
 {
+	IsGameOver = true;
 	HasWon = _hasWon;
-	Server_DisableInput();
 }
 
 void AGDP03_Summative2Character::Server_OnFire_Implementation()
@@ -231,16 +218,6 @@ bool AGDP03_Summative2Character::Server_OnFire_Validate()
 	return true;
 }
 
-void AGDP03_Summative2Character::Server_DisableInput_Implementation()
-{
-	MultiCast_DisableInput();
-}
-
-bool AGDP03_Summative2Character::Server_DisableInput_Validate()
-{
-	return true;
-}
-
 void AGDP03_Summative2Character::Server_PlayerDeath_Implementation()
 {
 	MultiCast_PlayerDeath();
@@ -259,33 +236,6 @@ void AGDP03_Summative2Character::GetLifetimeReplicatedProps(TArray<FLifetimeProp
 	DOREPLIFETIME(AGDP03_Summative2Character, CurrentObjective);
 	DOREPLIFETIME(AGDP03_Summative2Character, HasWon);
 	DOREPLIFETIME(AGDP03_Summative2Character, IsGameOver);
-}
-
-void AGDP03_Summative2Character::MultiCast_DisableInput_Implementation()
-{
-	for (auto it = GetWorld()->GetPlayerControllerIterator(); it; it++)
-	{
-		AGDP03_Summative2Character* character = Cast<AGDP03_Summative2Character>(it->Get()->GetCharacter());
-		if (character && character->GetController()->IsLocalController())
-		{
-			character->IsGameOver = true;
-		}
-
-		APlayerController* controller = Cast<APlayerController>(it->Get());
-		if (controller && controller->IsLocalController())
-		{
-			APawn* pawn = controller->GetPawn();
-			if (pawn)
-			{
-				pawn->DisableInput(controller);
-			}
-		}
-	}
-}
-
-bool AGDP03_Summative2Character::MultiCast_DisableInput_Validate()
-{
-	return true;
 }
 
 void AGDP03_Summative2Character::MultiCast_PlayerDeath_Implementation()
@@ -307,6 +257,21 @@ bool AGDP03_Summative2Character::MultiCast_PlayerDeath_Validate()
 
 void AGDP03_Summative2Character::OnRep_CurrentHealth()
 {
+	if (GetLocalRole() == ROLE_AutonomousProxy || GetLocalRole() == ROLE_SimulatedProxy)
+	{
+		if (CurrentHealth <= 0)
+		{
+			APlayerController* controller = Cast<APlayerController>(GetController());
+			if (controller)
+			{
+				APawn* mPawn = controller->GetPawn();
+				if (mPawn)
+				{
+					mPawn->DisableInput(controller);
+				}
+			}
+		}
+	}
 }
 
 void AGDP03_Summative2Character::OnRep_CurrentObjective()

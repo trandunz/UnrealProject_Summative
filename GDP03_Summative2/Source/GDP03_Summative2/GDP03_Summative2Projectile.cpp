@@ -52,6 +52,20 @@ void AGDP03_Summative2Projectile::OnHit(UPrimitiveComponent* HitComp, AActor* Ot
 			{
 				if (mCharacter->CurrentHealth > 0)
 					mCharacter->CurrentHealth -= 10;
+
+				if (mCharacter->CurrentHealth <= 0)
+				{
+					APlayerController* controller = Cast<APlayerController>(mCharacter->GetController());
+					if (controller)
+					{
+						APawn* mPawn = controller->GetPawn();
+						if (mPawn)
+						{
+							mPawn->DisableInput(controller);
+						}
+					}
+					
+				}
 			}
 		}
 	}

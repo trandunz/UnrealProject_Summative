@@ -38,8 +38,4 @@ void AExitTrigger::OnOverlapBegin(AActor* _overlapActor, AActor* _otherActor)
 
 void AExitTrigger::OnOverlapEnd(AActor* _overlapActor, AActor* _otherActor)
 {
-	if (_otherActor && _otherActor != this)
-	{
-		DISPLAY_LOG("Overlap Ended");
-	}
 }

@@ -13,7 +13,6 @@
 // Sets default values
 AObjectiveItem::AObjectiveItem()
 {
- 	// Set this actor to call Tick() every frame.  You can turn this off to improve performance if you don't need it.
 	PrimaryActorTick.bCanEverTick = true;
 
 	Mesh = CreateDefaultSubobject<class UStaticMeshComponent>(TEXT("Mesh"));
@@ -23,14 +22,14 @@ AObjectiveItem::AObjectiveItem()
 	TriggerCollider = CreateDefaultSubobject<class UBoxComponent>(TEXT("Trigger"));
 	TriggerCollider->SetBoxExtent(FVector(50.0f));
 	TriggerCollider->SetGenerateOverlapEvents(true);
-
 	TriggerCollider->SetupAttachment(RootComponent);
 	TriggerCollider->SetHiddenInGame(true);
+	TriggerCollider->SetVisibility(false);
 
 	if (HasAuthority())
 	{
 		bReplicates = true;
-		//SetReplicatingMovement(true);
+		SetReplicatingMovement(true);
 		Mesh->SetIsReplicated(true);
 		TriggerCollider->SetIsReplicated(true);
 	}
@@ -40,7 +39,7 @@ void AObjectiveItem::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLi
 {
 	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
 
-	DOREPLIFETIME(AObjectiveItem, ServerState);
+	DOREPLIFETIME(AObjectiveItem, serverState);
 }
 
 // Called when the game starts or when spawned
@@ -48,10 +47,14 @@ void AObjectiveItem::BeginPlay()
 {
 	Super::BeginPlay();
 
-	m_StartLocation = GetActorLocation();
-	m_MoveDirection = 1;
-	MoveSpeed = 1.0f;
-	Range = 5.0f;
+	if (HasAuthority())
+	{
+		m_StartLocation = GetActorLocation();
+		m_MoveDirection = 1;
+		MoveSpeed = 1.0f;
+		Amplitude = 50.0f;
+		m_ElapsedTime = 0.0f;
+	}
 
 	TriggerCollider->OnComponentBeginOverlap.RemoveDynamic(
 		this, &AObjectiveItem::HandleOverlap);
@@ -65,22 +68,49 @@ void AObjectiveItem::Tick(float DeltaTime)
 {
 	Super::Tick(DeltaTime);
 
-	/*if (GetLocalRole() == ROLE_AutonomousProxy)
-	{
-		FObjectMove move = CreateMove(DeltaTime);
-		SimulateMove(move);
-		Add(move);
-		Server_SendMove(move);
-	}
-	else if (HasAuthority() && IsLocallyControlled())
-	{
-		FObjectMove move = CreateMove(DeltaTime);
-		Server_SendMove(move);
-	}*/
 	if (HasAuthority())
 	{
-		Bounce();
+		m_ElapsedTime += DeltaTime;
+
+		FMove move;
+		move.time = m_ElapsedTime;
+		move.deltaTime = DeltaTime;
+		move.movementValue = MoveSpeed;
+		move.movementAmplitude = Amplitude;
+
+		FVector newLocation = SimulateMove(move);
+		AddActorWorldOffset(newLocation * move.deltaTime);
+
+		serverState.currentMove = move;
+		serverState.transform = GetActorTransform();
+
+		if (GetActorLocation().Z > m_StartLocation.Z + 50
+			|| GetActorLocation().Z < m_StartLocation.Z - 50)
+		{
+			Amplitude *= -1;
+		}
 	}
+	if (GetLocalRole() == ROLE_SimulatedProxy)
+	{
+		ClientTick(DeltaTime);
+	}
+}
+
+void AObjectiveItem::ClientTick(float DeltaTime)
+{
+	clientTimeSinceUpdate += DeltaTime;
+	if (clientTimeSinceUpdate < KINDA_SMALL_NUMBER) { return; }
+	float lerpRatio = clientTimeSinceUpdate / clientTimeBetweenLastUpdate;
+
+	FVector targetLocation = serverState.transform.GetLocation();
+	FVector startLocation = clientStartTransform.GetLocation();
+	FVector newlocaton = FMath::Lerp(startLocation, targetLocation, lerpRatio);
+	SetActorLocation(newlocaton);
+
+	FQuat targetRotation = serverState.transform.GetRotation();
+	FQuat startRotation = clientStartTransform.GetRotation();
+	FQuat newRotation = FQuat::Slerp(startRotation, targetRotation, lerpRatio);
+	SetActorRotation(newRotation);
 }
 
 void AObjectiveItem::HandleOverlap(UPrimitiveComponent* OverlappedComp,
@@ -97,61 +127,17 @@ void AObjectiveItem::HandleOverlap(UPrimitiveComponent* OverlappedComp,
 		if (playerCharacter->CurrentObjective == "Retrieve Ball")
 		{
 			playerCharacter->CurrentObjective = "Get To Exit";
-			Destroy();
 		}
 	}
 }
 
-void AObjectiveItem::Orbit()
+FVector AObjectiveItem::SimulateMove(FMove move)
 {
-	SetActorRelativeLocation(GetActorLocation() + (MoveSpeed * GetActorRightVector() * Range));
-	SetActorRelativeRotation(GetActorRotation() + FRotator(0, MoveSpeed, 0));
+	return FVector(0,0,move.movementAmplitude * move.movementValue);
 }
 
-void AObjectiveItem::Bounce()
+void AObjectiveItem::Server_SendMove_Implementation(FMove _move)
 {
-	FVector location = GetActorLocation();
-
-	if (location.Z < m_StartLocation.Z - 100 || location.Z > m_StartLocation.Z + 100)
-		m_MoveDirection *= -1;
-
-	location.Z += m_MoveDirection * MoveSpeed;
-
-	SetActorLocation(location);
-}
-
-FObjectMove AObjectiveItem::CreateMove(float _dt)
-{
-	return { _dt , FVector{0.0f,0.0f,(float)m_MoveDirection},GetActorRotation(), UGameplayStatics::GetRealTimeSeconds(GetWorld()) };
-}
-
-void AObjectiveItem::SimulateMove(FObjectMove& _move)
-{
-	FVector location = GetActorLocation();
-
-	if (location.Z < m_StartLocation.Z - 100 || location.Z > m_StartLocation.Z + 100)
-		m_MoveDirection *= -1;
-
-	location += _move.direction * MoveSpeed;
-
-	SetActorLocation(location);
-
-	_move.direction = { 0,0,(float)m_MoveDirection };
-	_move.rotation = GetActorRotation();
-}
-
-void AObjectiveItem::Add(FObjectMove _move)
-{
-	m_Moves.push_back(_move);
-}
-
-void AObjectiveItem::Server_SendMove_Implementation(FObjectMove _move)
-{
-	SimulateMove(_move);
-
-	ServerState.lastMove = _move;
-	ServerState.transform = GetActorTransform();
-	ServerState.velocity = _move.direction * MoveSpeed;
 }
 
 void AObjectiveItem::OnRep_ServerState()
@@ -169,33 +155,15 @@ void AObjectiveItem::OnRep_ServerState()
 
 void AObjectiveItem::SimulatedProxy_OnRep_ServerState()
 {
-	
+	clientTimeBetweenLastUpdate = clientTimeSinceUpdate;
+	clientTimeSinceUpdate = 0;
+
+	clientStartTransform = GetActorTransform();
 }
 
 void AObjectiveItem::AutonomousProxy_OnRep_ServerState()
 {
-	SetActorTransform(ServerState.transform);
-	m_MoveDirection = ServerState.velocity.Normalize();
-
-	for (std::vector<FObjectMove>::const_iterator move; move != m_Moves.end(); move++)
-	{
-		if (move->direction == ServerState.lastMove.direction
-			&& move->rotation == ServerState.lastMove.rotation)
-		{
-			break;
-		}
-		else
-		{
-			m_Moves.erase(move);
-		}
-	}
-
-	Add(ServerState.lastMove);
-
-	for (auto& move : m_Moves)
-	{
-		SimulateMove(move);
-	}
+	
 }
 
 bool AObjectiveItem::IsLocallyControlled()
@@ -223,7 +191,7 @@ bool AObjectiveItem::IsLocallyControlled()
 	return false;
 }
 
-bool AObjectiveItem::Server_SendMove_Validate(FObjectMove _move)
+bool AObjectiveItem::Server_SendMove_Validate(FMove _move)
 {
 	return true;
 }

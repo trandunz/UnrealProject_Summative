@@ -76,7 +76,7 @@ bool AMyPlayerController::HostSession(bool _lan)
 			sessionSettings->bAllowJoinViaPresence = true;
 			sessionSettings->bUseLobbiesIfAvailable = true;
 
-			sessionSettings->Set(SEARCH_KEYWORDS, FString("Custom"), EOnlineDataAdvertisementType::ViaOnlineService);
+			sessionSettings->Set(SEARCH_KEYWORDS, FString("Custom"), EOnlineDataAdvertisementType::ViaOnlineServiceAndPing);
 
 			session->AddOnCreateSessionCompleteDelegate_Handle
 			(
