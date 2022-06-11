@@ -13,7 +13,7 @@ struct FMove
 	FMove() {}
 
 	UPROPERTY()
-		float movementValue;
+		float movementSpeed;
 	UPROPERTY()
 		float movementAmplitude;
 	UPROPERTY()

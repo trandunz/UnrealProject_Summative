@@ -74,10 +74,8 @@ void AObjectiveItem::Tick(float DeltaTime)
 		FMove move;
 		move.time = m_ElapsedTime;
 		move.deltaTime = DeltaTime;
-		move.movementValue = MoveSpeed;
+		move.movementSpeed = MoveSpeed;
 		move.movementAmplitude = Amplitude;
-
-		SimulateMove(move);
 
 		AddMove(move);
 
@@ -90,7 +88,7 @@ void AObjectiveItem::Tick(float DeltaTime)
 		FMove move;
 		move.time = m_ElapsedTime;
 		move.deltaTime = DeltaTime;
-		move.movementValue = MoveSpeed;
+		move.movementSpeed = MoveSpeed;
 		move.movementAmplitude = Amplitude;
 
 		Server_SendMove(move);
@@ -144,7 +142,7 @@ void AObjectiveItem::AddMove(FMove _move)
 
 FVector AObjectiveItem::SimulateMove(FMove move)
 {
-	return FVector(0,0, move.movementAmplitude * cosf(move.time * move.movementValue));
+	return FVector(0,0, move.movementAmplitude * cosf(move.time * move.movementSpeed));
 }
 
 void AObjectiveItem::Server_SendMove_Implementation(FMove _move)

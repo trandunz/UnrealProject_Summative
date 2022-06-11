@@ -14,6 +14,38 @@ class UMotionControllerComponent;
 class UAnimMontage;
 class USoundBase;
 
+USTRUCT()
+struct FPMove
+{
+	GENERATED_BODY()
+
+		FPMove() {}
+
+	UPROPERTY()
+		FVector moveDirection;
+	UPROPERTY()
+		FRotator rotation;
+	UPROPERTY()
+		float deltaTime;
+	UPROPERTY()
+		float time;
+};
+
+USTRUCT()
+struct FPServerState
+{
+	GENERATED_BODY()
+
+		FPServerState() {}
+
+	UPROPERTY()
+		FPMove currentMove;
+	UPROPERTY()
+		FTransform transform;
+	UPROPERTY()
+		FVector velocity;
+};
+
 UCLASS(config=Game)
 class AGDP03_Summative2Character : public ACharacter
 {
@@ -52,6 +84,8 @@ class AGDP03_Summative2Character : public ACharacter
 	UMotionControllerComponent* L_MotionController;
 
 	bool EnableInput = true;
+
+	float m_ElapsedTime;
 
 public:
 	AGDP03_Summative2Character();
@@ -103,6 +137,22 @@ public:
 	UFUNCTION()
 		void EndTheGame(bool _hasWon);
 
+	float clientTimeSinceUpdate;
+	float clientTimeBetweenLastUpdate;
+	FTransform clientStartTransform;
+	FVector clientStartVelocity;
+
+	FPMove Moves[5];
+
+	UPROPERTY(ReplicatedUsing = OnRep_ServerState)
+	FPServerState serverState;
+
+	FVector SimulateMove(FPMove move);
+
+	void AddMove(FPMove _move);
+
+	void ClientTick(float DeltaTime);
+
 protected:
 	
 	virtual void Tick(float _deltaTime);
@@ -115,6 +165,9 @@ protected:
 
 	UFUNCTION(Server, Reliable, WithValidation)
 		void Server_PlayerDeath();
+
+	UFUNCTION(Server, Reliable, WithValidation)
+		void Server_SendMove(FPMove _move);
 
 	UFUNCTION(NetMultiCast, Reliable, WithValidation)
 		void MultiCast_PlayerDeath();
@@ -130,6 +183,15 @@ protected:
 
 	UFUNCTION()
 		void OnRep_IsGameOver();
+
+	UFUNCTION()
+		void OnRep_ServerState();
+
+	UFUNCTION()
+		void AutonomousProxy_OnRep_ServerState();
+
+	UFUNCTION()
+		void SimulatedProxy_OnRep_ServerState();
 
 	/** Resets HMD orientation and position in VR. */
 	void OnResetVR();

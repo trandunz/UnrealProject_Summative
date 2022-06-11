@@ -8,6 +8,7 @@
 #include "Components/InputComponent.h"
 #include "GameFramework/InputSettings.h"
 #include "HeadMountedDisplayFunctionLibrary.h"
+#include "GameFramework/CharacterMovementComponent.h"
 #include "Kismet/GameplayStatics.h"
 #include "MyPlayerController.h"
 #include "MotionControllerComponent.h"
@@ -149,6 +150,36 @@ void AGDP03_Summative2Character::SetupPlayerInputComponent(class UInputComponent
 void AGDP03_Summative2Character::Tick(float _deltaTime)
 {
 	Super::Tick(_deltaTime);
+	if (GetLocalRole() == ROLE_AutonomousProxy)
+	{
+		m_ElapsedTime += _deltaTime;
+
+		FPMove move;
+		move.time = m_ElapsedTime;
+		move.deltaTime = _deltaTime;
+		move.rotation = GetActorRotation();
+		move.moveDirection = GetPendingMovementInputVector();
+
+		AddMove(move);
+
+		Server_SendMove(move);
+	}
+	if (HasAuthority() && IsLocallyControlled())
+	{
+		m_ElapsedTime += _deltaTime;
+
+		FPMove move;
+		move.time = m_ElapsedTime;
+		move.deltaTime = _deltaTime;
+		move.rotation = GetActorRotation();
+		move.moveDirection = GetPendingMovementInputVector();
+
+		Server_SendMove(move);
+	}
+	if (GetLocalRole() == ROLE_SimulatedProxy)
+	{
+		ClientTick(_deltaTime);
+	}
 }
 
 void AGDP03_Summative2Character::OnFire()
@@ -218,6 +249,21 @@ bool AGDP03_Summative2Character::Server_OnFire_Validate()
 	return true;
 }
 
+void AGDP03_Summative2Character::Server_SendMove_Implementation(FPMove _move)
+{
+	FVector newLocation = SimulateMove(_move);
+	AddActorWorldOffset(newLocation * _move.deltaTime);
+
+	serverState.velocity = newLocation;
+	serverState.currentMove = _move;
+	serverState.transform = GetActorTransform();
+}
+
+bool AGDP03_Summative2Character::Server_SendMove_Validate(FPMove _move)
+{
+	return true;
+}
+
 void AGDP03_Summative2Character::Server_PlayerDeath_Implementation()
 {
 	MultiCast_PlayerDeath();
@@ -236,6 +282,7 @@ void AGDP03_Summative2Character::GetLifetimeReplicatedProps(TArray<FLifetimeProp
 	DOREPLIFETIME(AGDP03_Summative2Character, CurrentObjective);
 	DOREPLIFETIME(AGDP03_Summative2Character, HasWon);
 	DOREPLIFETIME(AGDP03_Summative2Character, IsGameOver);
+	DOREPLIFETIME(AGDP03_Summative2Character, serverState);
 }
 
 void AGDP03_Summative2Character::MultiCast_PlayerDeath_Implementation()
@@ -286,10 +333,76 @@ void AGDP03_Summative2Character::OnRep_IsGameOver()
 {
 }
 
+void AGDP03_Summative2Character::AutonomousProxy_OnRep_ServerState()
+{
+	SetActorTransform(serverState.transform);
+	GetMovementComponent()->Velocity = serverState.velocity;
+
+	int sizeOfMoves = sizeof(Moves) / sizeof(FPMove);
+	int location = 0;
+	for (int i = 0; i < sizeOfMoves; i++)
+	{
+		if (SimulateMove(Moves[i]) == SimulateMove(serverState.currentMove))
+		{
+			break;
+		}
+		else
+		{
+			location++;
+			Moves[i] = FPMove();
+		}
+	}
+
+	for (int i = location; i < sizeOfMoves; i++)
+	{
+		AddActorWorldOffset(SimulateMove(Moves[i]));
+	}
+	
+}
+
+void AGDP03_Summative2Character::SimulatedProxy_OnRep_ServerState()
+{
+	clientTimeBetweenLastUpdate = clientTimeSinceUpdate;
+	clientTimeSinceUpdate = 0;
+
+	clientStartTransform = GetActorTransform();
+	clientStartVelocity = GetVelocity();
+}
+
+void AGDP03_Summative2Character::OnRep_ServerState()
+{
+	if (GetLocalRole() == ROLE_AutonomousProxy)
+	{
+		AutonomousProxy_OnRep_ServerState();
+
+	}
+	else if (GetLocalRole() == ROLE_SimulatedProxy)
+	{
+		SimulatedProxy_OnRep_ServerState();
+	}
+}
+
 void AGDP03_Summative2Character::OnResetVR()
 {
 	UHeadMountedDisplayFunctionLibrary::ResetOrientationAndPosition();
 }
+
+void AGDP03_Summative2Character::ClientTick(float DeltaTime)
+{
+	clientTimeSinceUpdate += DeltaTime;
+	if (clientTimeSinceUpdate < KINDA_SMALL_NUMBER) { return; }
+	float lerpRatio = clientTimeSinceUpdate / clientTimeBetweenLastUpdate;
+
+	FVector targetLocation = serverState.transform.GetLocation();
+	FVector startLocation = clientStartTransform.GetLocation();
+	FVector newlocaton = FMath::Lerp(startLocation, targetLocation, lerpRatio);
+	SetActorLocation(newlocaton);
+
+	FQuat targetRotation = serverState.transform.GetRotation();
+	FQuat startRotation = clientStartTransform.GetRotation();
+	FQuat newRotation = FQuat::Slerp(startRotation, targetRotation, lerpRatio);
+	SetActorRotation(newRotation);
+} 
 
 void AGDP03_Summative2Character::BeginTouch(const ETouchIndex::Type FingerIndex, const FVector Location)
 {
@@ -315,44 +428,6 @@ void AGDP03_Summative2Character::EndTouch(const ETouchIndex::Type FingerIndex, c
 	}
 	TouchItem.bIsPressed = false;
 }
-
-//Commenting this section out to be consistent with FPS BP template.
-//This allows the user to turn without using the right virtual joystick
-
-//void AGDP03_Summative2Character::TouchUpdate(const ETouchIndex::Type FingerIndex, const FVector Location)
-//{
-//	if ((TouchItem.bIsPressed == true) && (TouchItem.FingerIndex == FingerIndex))
-//	{
-//		if (TouchItem.bIsPressed)
-//		{
-//			if (GetWorld() != nullptr)
-//			{
-//				UGameViewportClient* ViewportClient = GetWorld()->GetGameViewport();
-//				if (ViewportClient != nullptr)
-//				{
-//					FVector MoveDelta = Location - TouchItem.Location;
-//					FVector2D ScreenSize;
-//					ViewportClient->GetViewportSize(ScreenSize);
-//					FVector2D ScaledDelta = FVector2D(MoveDelta.X, MoveDelta.Y) / ScreenSize;
-//					if (FMath::Abs(ScaledDelta.X) >= 4.0 / ScreenSize.X)
-//					{
-//						TouchItem.bMoved = true;
-//						float Value = ScaledDelta.X * BaseTurnRate;
-//						AddControllerYawInput(Value);
-//					}
-//					if (FMath::Abs(ScaledDelta.Y) >= 4.0 / ScreenSize.Y)
-//					{
-//						TouchItem.bMoved = true;
-//						float Value = ScaledDelta.Y * BaseTurnRate;
-//						AddControllerPitchInput(Value);
-//					}
-//					TouchItem.Location = Location;
-//				}
-//				TouchItem.Location = Location;
-//			}
-//		}
-//	}
-//}
 
 void AGDP03_Summative2Character::MoveForward(float Value)
 {
@@ -382,6 +457,17 @@ void AGDP03_Summative2Character::LookUpAtRate(float Rate)
 {
 	// calculate delta for this frame from the rate information
 	AddControllerPitchInput(Rate * BaseLookUpRate * GetWorld()->GetDeltaSeconds());
+}
+
+void AGDP03_Summative2Character::AddMove(FPMove _move)
+{
+	int size = sizeof(Moves) / sizeof(FPMove);
+	Moves[(size + 1) % 5] = _move;
+}
+
+FVector AGDP03_Summative2Character::SimulateMove(FPMove move)
+{
+	return FQuat(move.rotation) * (move.moveDirection);
 }
 
 bool AGDP03_Summative2Character::EnableTouchscreenMovement(class UInputComponent* PlayerInputComponent)
