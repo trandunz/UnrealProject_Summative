@@ -22,9 +22,9 @@ struct FPMove
 		FPMove() {}
 
 	UPROPERTY()
-		FVector moveDirection;
+		FVector moveDirection = {0,0,0};
 	UPROPERTY()
-		FRotator rotation;
+		FRotator rotation = { 0,0,0 };
 	UPROPERTY()
 		float deltaTime;
 	UPROPERTY()
@@ -142,6 +142,9 @@ public:
 	FTransform clientStartTransform;
 	FVector clientStartVelocity;
 
+
+	FVector Velocity;
+
 	FPMove Moves[5];
 
 	UPROPERTY(ReplicatedUsing = OnRep_ServerState)
@@ -164,13 +167,7 @@ protected:
 		void Server_OnFire();
 
 	UFUNCTION(Server, Reliable, WithValidation)
-		void Server_PlayerDeath();
-
-	UFUNCTION(Server, Reliable, WithValidation)
 		void Server_SendMove(FPMove _move);
-
-	UFUNCTION(NetMultiCast, Reliable, WithValidation)
-		void MultiCast_PlayerDeath();
 
 	UFUNCTION()
 		void OnRep_CurrentHealth();

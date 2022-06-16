@@ -2,7 +2,9 @@
 
 
 #include "MovingPlatform.h"
+#include "Kismet/GameplayStatics.h"
 #include "Components/StaticMeshComponent.h"
+#include "Net/UnrealNetwork.h"
 
 // Sets default values
 AMovingPlatform::AMovingPlatform()
@@ -13,10 +15,6 @@ AMovingPlatform::AMovingPlatform()
 	Mesh = CreateDefaultSubobject<UStaticMeshComponent>("Platform");
 	Mesh->SetupAttachment(RootComponent);
 
-
-	m_MoveAxis = { 1,0,0 };
-	m_MoveDirection = 1;
-
 	if (HasAuthority())
 	{
 		bReplicates = true;
@@ -25,11 +23,69 @@ AMovingPlatform::AMovingPlatform()
 	}
 }
 
+void AMovingPlatform::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
+{
+	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
+
+	DOREPLIFETIME(AMovingPlatform, serverState);
+}
+
 // Called when the game starts or when spawned
 void AMovingPlatform::BeginPlay()
 {
 	Super::BeginPlay();
-	m_StartLocation = GetActorLocation();
+
+	if (HasAuthority())
+	{
+		m_StartLocation = GetActorLocation();
+		m_MoveDirection = 1;
+		m_ElapsedTime = 0.0f;
+	}
+}
+
+FVector AMovingPlatform::SimulateMove(FMPMove move)
+{
+	if (MoveAxis.X != 0)
+	{
+		return FVector(move.movementAmplitude * cosf(move.time * move.movementSpeed), 0, 0);
+	}
+	if (MoveAxis.Y != 0)
+	{
+		return FVector(0, move.movementAmplitude * cosf(move.time * move.movementSpeed), 0);
+	}
+	else
+		return FVector(0, 0, move.movementAmplitude * cosf(move.time * move.movementSpeed));
+}
+
+void AMovingPlatform::AddMove(FMPMove _move)
+{
+	int size = sizeof(Moves) / sizeof(FMPMove);
+	Moves[(size + 1) % 5] = _move;
+}
+
+bool AMovingPlatform::IsLocallyControlled()
+{
+	const ENetMode NetMode = GetNetMode();
+
+	if (NetMode == NM_Standalone)
+	{
+		// Not networked.
+		return true;
+	}
+
+	if (NetMode == NM_Client && GetLocalRole() == ROLE_AutonomousProxy)
+	{
+		// Networked client in control.
+		return true;
+	}
+
+	if (GetRemoteRole() != ROLE_AutonomousProxy && GetLocalRole() == ROLE_Authority)
+	{
+		// Local authority in control.
+		return true;
+	}
+
+	return false;
 }
 
 // Called every frame
@@ -37,39 +93,113 @@ void AMovingPlatform::Tick(float DeltaTime)
 {
 	Super::Tick(DeltaTime);
 
-	if (HasAuthority())
+	if (GetLocalRole() == ROLE_AutonomousProxy)
 	{
-		Movement();
+		m_ElapsedTime += DeltaTime;
+
+		FMPMove move;
+		move.time = m_ElapsedTime;
+		move.deltaTime = DeltaTime;
+		move.movementSpeed = MoveSpeed;
+		move.movementAmplitude = Amplitude;
+
+		AddMove(move);
+
+		Server_SendMove(move);
+	}
+	if (HasAuthority() && IsLocallyControlled())
+	{
+		m_ElapsedTime += DeltaTime;
+
+		FMPMove move;
+		move.time = m_ElapsedTime;
+		move.deltaTime = DeltaTime;
+		move.movementSpeed = MoveSpeed;
+		move.movementAmplitude = Amplitude;
+
+		Server_SendMove(move);
+	}
+	if (GetLocalRole() == ROLE_SimulatedProxy)
+	{
+		ClientTick(DeltaTime);
 	}
 }
 
-void AMovingPlatform::Movement()
+void AMovingPlatform::ClientTick(float DeltaTime)
 {
-	FVector location = GetActorLocation();
+	clientTimeSinceUpdate += DeltaTime;
+	if (clientTimeSinceUpdate < KINDA_SMALL_NUMBER) { return; }
+	float lerpRatio = clientTimeSinceUpdate / clientTimeBetweenLastUpdate;
 
-	if (m_MoveAxis.X != 0)
+	FVector targetLocation = serverState.transform.GetLocation();
+	FVector startLocation = clientStartTransform.GetLocation();
+	FVector newlocaton = FMath::Lerp(startLocation, targetLocation, lerpRatio);
+	SetActorLocation(newlocaton);
+
+	FQuat targetRotation = serverState.transform.GetRotation();
+	FQuat startRotation = clientStartTransform.GetRotation();
+	FQuat newRotation = FQuat::Slerp(startRotation, targetRotation, lerpRatio);
+	SetActorRotation(newRotation);
+}
+
+void AMovingPlatform::Server_SendMove_Implementation(FMPMove _move)
+{
+	FVector newLocation = SimulateMove(_move);
+	AddActorWorldOffset(newLocation * _move.deltaTime);
+
+	serverState.currentMove = _move;
+	serverState.transform = GetActorTransform();
+}
+
+bool AMovingPlatform::Server_SendMove_Validate(FMPMove _move)
+{
+	return true;
+}
+
+void AMovingPlatform::OnRep_ServerState()
+{
+	if (GetLocalRole() == ROLE_AutonomousProxy)
 	{
-		if (location.X < m_StartLocation.X - 200 || location.X > m_StartLocation.X + 200)
-			m_MoveDirection *= -1;
+		AutonomousProxy_OnRep_ServerState();
 
-		location.X += m_MoveDirection * MoveSpeed;
 	}
-	if (m_MoveAxis.Y != 0)
+	else if (GetLocalRole() == ROLE_SimulatedProxy)
 	{
-		if (location.Y < m_StartLocation.Y - 200 || location.Y > m_StartLocation.Y + 200)
-			m_MoveDirection *= -1;
-
-		location.Y += m_MoveDirection * MoveSpeed;
+		SimulatedProxy_OnRep_ServerState();
 	}
-	if (m_MoveAxis.Z != 0)
+}
+
+void AMovingPlatform::SimulatedProxy_OnRep_ServerState()
+{
+	clientTimeBetweenLastUpdate = clientTimeSinceUpdate;
+	clientTimeSinceUpdate = 0;
+
+	clientStartTransform = GetActorTransform();
+}
+
+void AMovingPlatform::AutonomousProxy_OnRep_ServerState()
+{
+	SetActorTransform(serverState.transform);
+
+	int sizeOfMoves = sizeof(Moves) / sizeof(FMPMove);
+	int location = 0;
+	for (int i = 0; i < sizeOfMoves; i++)
 	{
-		if (location.Z < m_StartLocation.Z - 200 || location.Z > m_StartLocation.Z + 200)
-			m_MoveDirection *= -1;
-
-		location.Z += m_MoveDirection * MoveSpeed;
+		if (SimulateMove(Moves[i]) == SimulateMove(serverState.currentMove))
+		{
+			break;
+		}
+		else
+		{
+			location++;
+			Moves[i] = FMPMove();
+		}
 	}
-	
-	SetActorLocation(location);
+
+	for (int i = location; i < sizeOfMoves; i++)
+	{
+		SetActorLocation(SimulateMove(Moves[i]));
+	}
 }
 
 

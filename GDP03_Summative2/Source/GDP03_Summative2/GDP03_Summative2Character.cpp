@@ -164,7 +164,7 @@ void AGDP03_Summative2Character::Tick(float _deltaTime)
 
 		Server_SendMove(move);
 	}
-	if (HasAuthority() && IsLocallyControlled())
+	/*if (HasAuthority() && IsLocallyControlled())
 	{
 		m_ElapsedTime += _deltaTime;
 
@@ -175,7 +175,7 @@ void AGDP03_Summative2Character::Tick(float _deltaTime)
 		move.moveDirection = GetPendingMovementInputVector();
 
 		Server_SendMove(move);
-	}
+	}*/
 	if (GetLocalRole() == ROLE_SimulatedProxy)
 	{
 		ClientTick(_deltaTime);
@@ -251,25 +251,12 @@ bool AGDP03_Summative2Character::Server_OnFire_Validate()
 
 void AGDP03_Summative2Character::Server_SendMove_Implementation(FPMove _move)
 {
-	FVector newLocation = SimulateMove(_move);
-	AddActorWorldOffset(newLocation * _move.deltaTime);
-
-	serverState.velocity = newLocation;
+	serverState.velocity = SimulateMove(_move);
 	serverState.currentMove = _move;
 	serverState.transform = GetActorTransform();
 }
 
 bool AGDP03_Summative2Character::Server_SendMove_Validate(FPMove _move)
-{
-	return true;
-}
-
-void AGDP03_Summative2Character::Server_PlayerDeath_Implementation()
-{
-	MultiCast_PlayerDeath();
-}
-
-bool AGDP03_Summative2Character::Server_PlayerDeath_Validate()
 {
 	return true;
 }
@@ -283,23 +270,6 @@ void AGDP03_Summative2Character::GetLifetimeReplicatedProps(TArray<FLifetimeProp
 	DOREPLIFETIME(AGDP03_Summative2Character, HasWon);
 	DOREPLIFETIME(AGDP03_Summative2Character, IsGameOver);
 	DOREPLIFETIME(AGDP03_Summative2Character, serverState);
-}
-
-void AGDP03_Summative2Character::MultiCast_PlayerDeath_Implementation()
-{
-	for (auto it = GetWorld()->GetPlayerControllerIterator(); it; it++)
-	{
-		AGDP03_Summative2Character* character = Cast<AGDP03_Summative2Character>(it->Get()->GetCharacter());
-		if (character && character->GetController()->IsLocalController())
-		{
-			character->HasWon = true;
-		}
-	}
-}
-
-bool AGDP03_Summative2Character::MultiCast_PlayerDeath_Validate()
-{
-	return true;
 }
 
 void AGDP03_Summative2Character::OnRep_CurrentHealth()
@@ -336,26 +306,17 @@ void AGDP03_Summative2Character::OnRep_IsGameOver()
 void AGDP03_Summative2Character::AutonomousProxy_OnRep_ServerState()
 {
 	SetActorTransform(serverState.transform);
-	GetMovementComponent()->Velocity = serverState.velocity;
+	Velocity = serverState.velocity;
 
-	int sizeOfMoves = sizeof(Moves) / sizeof(FPMove);
-	int location = 0;
-	for (int i = 0; i < sizeOfMoves; i++)
+	for (auto& move : Moves)
 	{
-		if (SimulateMove(Moves[i]) == SimulateMove(serverState.currentMove))
-		{
-			break;
-		}
-		else
-		{
-			location++;
-			Moves[i] = FPMove();
-		}
+		move = {};
 	}
+	AddMove(serverState.currentMove);
 
-	for (int i = location; i < sizeOfMoves; i++)
+	for (auto& move : Moves)
 	{
-		AddActorWorldOffset(SimulateMove(Moves[i]));
+		AddActorWorldOffset(SimulateMove(move));
 	}
 	
 }
@@ -373,7 +334,7 @@ void AGDP03_Summative2Character::OnRep_ServerState()
 {
 	if (GetLocalRole() == ROLE_AutonomousProxy)
 	{
-		AutonomousProxy_OnRep_ServerState();
+		//AutonomousProxy_OnRep_ServerState();
 
 	}
 	else if (GetLocalRole() == ROLE_SimulatedProxy)
