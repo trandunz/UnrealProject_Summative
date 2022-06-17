@@ -59,14 +59,13 @@ protected:
 	float clientTimeBetweenLastUpdate;
 	FTransform clientStartTransform;
 
-	FMove Moves[5];
+	TArray<FMove> m_Moves;
 
 	UPROPERTY(ReplicatedUsing = OnRep_ServerState)
 	FServerState serverState;
 
 	FVector SimulateMove(FMove move);
-
-	void AddMove(FMove _move);
+	FMove CreateMove(float DeltaTime);
 
 	bool IsLocallyControlled();
 

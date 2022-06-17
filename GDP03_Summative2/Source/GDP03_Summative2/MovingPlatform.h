@@ -60,14 +60,12 @@ protected:
 	// Called when the game starts or when spawned
 	virtual void BeginPlay() override;
 
-	FMPMove Moves[5];
+	TArray<FMPMove> Moves;
 
 	UPROPERTY(ReplicatedUsing = OnRep_ServerState)
 		FMPServerState serverState;
 
 	FVector SimulateMove(FMPMove move);
-
-	void AddMove(FMPMove _move);
 
 	bool IsLocallyControlled();
 
@@ -75,6 +73,7 @@ public:
 	// Called every frame
 	virtual void Tick(float DeltaTime) override;
 	void ClientTick(float DeltaTime);
+	FMPMove CreateMove(float DeltaTime);
 
 	UFUNCTION(Server, Reliable, WithValidation)
 		void Server_SendMove(FMPMove _move);

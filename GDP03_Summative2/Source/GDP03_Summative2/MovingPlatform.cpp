@@ -57,12 +57,6 @@ FVector AMovingPlatform::SimulateMove(FMPMove move)
 		return FVector(0, 0, move.movementAmplitude * cosf(move.time * move.movementSpeed));
 }
 
-void AMovingPlatform::AddMove(FMPMove _move)
-{
-	int size = sizeof(Moves) / sizeof(FMPMove);
-	Moves[(size + 1) % 5] = _move;
-}
-
 bool AMovingPlatform::IsLocallyControlled()
 {
 	const ENetMode NetMode = GetNetMode();
@@ -97,13 +91,11 @@ void AMovingPlatform::Tick(float DeltaTime)
 	{
 		m_ElapsedTime += DeltaTime;
 
-		FMPMove move;
-		move.time = m_ElapsedTime;
-		move.deltaTime = DeltaTime;
-		move.movementSpeed = MoveSpeed;
-		move.movementAmplitude = Amplitude;
+		FMPMove move = CreateMove(DeltaTime);
 
-		AddMove(move);
+		SetActorLocation(m_StartLocation + SimulateMove(move));
+
+		Moves.Add(move);
 
 		Server_SendMove(move);
 	}
@@ -111,13 +103,12 @@ void AMovingPlatform::Tick(float DeltaTime)
 	{
 		m_ElapsedTime += DeltaTime;
 
-		FMPMove move;
-		move.time = m_ElapsedTime;
-		move.deltaTime = DeltaTime;
-		move.movementSpeed = MoveSpeed;
-		move.movementAmplitude = Amplitude;
+		FMPMove move = CreateMove(DeltaTime);
 
-		Server_SendMove(move);
+		SetActorLocation(m_StartLocation + SimulateMove(move));
+
+		serverState.currentMove = move;
+		serverState.transform = GetActorTransform();
 	}
 	if (GetLocalRole() == ROLE_SimulatedProxy)
 	{
@@ -140,6 +131,16 @@ void AMovingPlatform::ClientTick(float DeltaTime)
 	FQuat startRotation = clientStartTransform.GetRotation();
 	FQuat newRotation = FQuat::Slerp(startRotation, targetRotation, lerpRatio);
 	SetActorRotation(newRotation);
+}
+
+FMPMove AMovingPlatform::CreateMove(float DeltaTime)
+{
+	FMPMove move;
+	move.time = m_ElapsedTime;
+	move.deltaTime = DeltaTime;
+	move.movementSpeed = MoveSpeed;
+	move.movementAmplitude = Amplitude;
+	return move;
 }
 
 void AMovingPlatform::Server_SendMove_Implementation(FMPMove _move)
@@ -178,26 +179,18 @@ void AMovingPlatform::SimulatedProxy_OnRep_ServerState()
 
 void AMovingPlatform::AutonomousProxy_OnRep_ServerState()
 {
-	SetActorTransform(serverState.transform);
-
-	int sizeOfMoves = sizeof(Moves) / sizeof(FMPMove);
-	int location = 0;
-	for (int i = 0; i < sizeOfMoves; i++)
+	TArray<FMPMove> newMoves;
+	for (auto& move : Moves)
 	{
-		if (SimulateMove(Moves[i]) == SimulateMove(serverState.currentMove))
+		if (move.time > serverState.currentMove.time)
 		{
-			break;
-		}
-		else
-		{
-			location++;
-			Moves[i] = FMPMove();
+			newMoves.Add(move);
 		}
 	}
-
-	for (int i = location; i < sizeOfMoves; i++)
+	Moves = newMoves;
+	for (auto& move : Moves)
 	{
-		SetActorLocation(SimulateMove(Moves[i]));
+		SimulateMove(move);
 	}
 }
 

@@ -50,16 +50,14 @@ void AObjectiveItem::BeginPlay()
 	{
 		m_StartLocation = GetActorLocation();
 		m_MoveDirection = 1;
-		MoveSpeed = 1.0f;
-		Amplitude = 50.0f;
 		m_ElapsedTime = 0.0f;
+
+		TriggerCollider->OnComponentBeginOverlap.RemoveDynamic(
+			this, &AObjectiveItem::HandleOverlap);
+
+		TriggerCollider->OnComponentBeginOverlap.AddDynamic(
+			this, &AObjectiveItem::HandleOverlap);
 	}
-
-	TriggerCollider->OnComponentBeginOverlap.RemoveDynamic(
-		this, &AObjectiveItem::HandleOverlap);
-
-	TriggerCollider->OnComponentBeginOverlap.AddDynamic(
-		this, &AObjectiveItem::HandleOverlap);
 }
 
 // Called every frame
@@ -71,13 +69,11 @@ void AObjectiveItem::Tick(float DeltaTime)
 	{
 		m_ElapsedTime += DeltaTime;
 
-		FMove move;
-		move.time = m_ElapsedTime;
-		move.deltaTime = DeltaTime;
-		move.movementSpeed = MoveSpeed;
-		move.movementAmplitude = Amplitude;
+		FMove move = CreateMove(DeltaTime);
 
-		AddMove(move);
+		SetActorLocation(m_StartLocation + SimulateMove(move));
+
+		m_Moves.Add(move);
 
 		Server_SendMove(move);
 	}
@@ -85,13 +81,12 @@ void AObjectiveItem::Tick(float DeltaTime)
 	{
 		m_ElapsedTime += DeltaTime;
 
-		FMove move;
-		move.time = m_ElapsedTime;
-		move.deltaTime = DeltaTime;
-		move.movementSpeed = MoveSpeed;
-		move.movementAmplitude = Amplitude;
+		FMove move = CreateMove(DeltaTime);
 
-		Server_SendMove(move);
+		SetActorLocation(m_StartLocation + SimulateMove(move));
+
+		serverState.currentMove = move;
+		serverState.transform = GetActorTransform();
 	}
 	if (GetLocalRole() == ROLE_SimulatedProxy)
 	{
@@ -134,21 +129,24 @@ void AObjectiveItem::HandleOverlap(UPrimitiveComponent* OverlappedComp,
 	}
 }
 
-void AObjectiveItem::AddMove(FMove _move)
-{
-	int size = sizeof(Moves) / sizeof(FMove);
-	Moves[(size + 1) % 5] = _move;
-}
-
 FVector AObjectiveItem::SimulateMove(FMove move)
 {
 	return FVector(0,0, move.movementAmplitude * cosf(move.time * move.movementSpeed));
 }
 
+FMove AObjectiveItem::CreateMove(float DeltaTime)
+{
+	FMove move;
+	move.time = m_ElapsedTime;
+	move.deltaTime = DeltaTime;
+	move.movementSpeed = MoveSpeed;
+	move.movementAmplitude = Amplitude;
+	return move;
+}
+
 void AObjectiveItem::Server_SendMove_Implementation(FMove _move)
 {
-	FVector newLocation = SimulateMove(_move);
-	AddActorWorldOffset(newLocation * _move.deltaTime);
+	SetActorLocation(m_StartLocation + SimulateMove(_move));
 
 	serverState.currentMove = _move;
 	serverState.transform = GetActorTransform();
@@ -177,26 +175,18 @@ void AObjectiveItem::SimulatedProxy_OnRep_ServerState()
 
 void AObjectiveItem::AutonomousProxy_OnRep_ServerState()
 {
-	SetActorTransform(serverState.transform);
-
-	int sizeOfMoves = sizeof(Moves) / sizeof(FMove);
-	int location = 0;
-	for (int i = 0; i < sizeOfMoves; i++)
+	TArray<FMove> newMoves;
+	for (auto& move : m_Moves)
 	{
-		if (SimulateMove(Moves[i]) == SimulateMove(serverState.currentMove))
+		if (move.time > serverState.currentMove.time)
 		{
-			break;
-		}
-		else
-		{
-			location++;
-			Moves[i] = FMove();
+			newMoves.Add(move);
 		}
 	}
-
-	for (int i = location; i < sizeOfMoves; i++)
+	m_Moves = newMoves;
+	for (auto& move : m_Moves)
 	{
-		SetActorLocation(SimulateMove(Moves[i]));
+		SimulateMove(move);
 	}
 }
 

@@ -154,10 +154,7 @@ void AGDP03_Summative2Character::Tick(float _deltaTime)
 	{
 		m_ElapsedTime += _deltaTime;
 
-		FPMove move;
-		move.time = m_ElapsedTime;
-		move.deltaTime = _deltaTime;
-		move.moveDirection = InputVector;
+		FPMove move = CreateMove(_deltaTime);
 
 		SimulateMove(move);
 
@@ -169,10 +166,7 @@ void AGDP03_Summative2Character::Tick(float _deltaTime)
 	{
 		m_ElapsedTime += _deltaTime;
 
-		FPMove move;
-		move.time = m_ElapsedTime;
-		move.deltaTime = _deltaTime;
-		move.moveDirection = InputVector;
+		FPMove move = CreateMove(_deltaTime);
 
 		SimulateMove(move);
 
@@ -206,12 +200,6 @@ void AGDP03_Summative2Character::OnFire()
 			AnimInstance->Montage_Play(FireAnimation, 1.f);
 		}
 	}
-}
-
-void AGDP03_Summative2Character::EndTheGame(bool _hasWon)
-{
-	IsGameOver = true;
-	HasWon = _hasWon;
 }
 
 void AGDP03_Summative2Character::Server_OnFire_Implementation()
@@ -311,7 +299,6 @@ void AGDP03_Summative2Character::AutonomousProxy_OnRep_ServerState()
 {
 
 	TArray<FPMove> newMoves;
-	
 	for (auto& move : Moves)
 	{
 		if (move.time > serverState.currentMove.time)
@@ -332,7 +319,6 @@ void AGDP03_Summative2Character::SimulatedProxy_OnRep_ServerState()
 	clientTimeSinceUpdate = 0;
 
 	clientStartTransform = GetActorTransform();
-	clientStartVelocity = GetVelocity();
 }
 
 void AGDP03_Summative2Character::OnRep_ServerState()
@@ -367,7 +353,16 @@ void AGDP03_Summative2Character::ClientTick(float DeltaTime)
 	FQuat startRotation = clientStartTransform.GetRotation();
 	FQuat newRotation = FQuat::Slerp(startRotation, targetRotation, lerpRatio);
 	SetActorRotation(newRotation);
-} 
+}
+FPMove AGDP03_Summative2Character::CreateMove(float DeltaTime)
+{
+	FPMove move;
+	move.time = m_ElapsedTime;
+	move.deltaTime = DeltaTime;
+	move.moveDirection = InputVector;
+	return move;
+}
+
 
 void AGDP03_Summative2Character::BeginTouch(const ETouchIndex::Type FingerIndex, const FVector Location)
 {

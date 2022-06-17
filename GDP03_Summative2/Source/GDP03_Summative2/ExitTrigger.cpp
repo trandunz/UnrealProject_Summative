@@ -17,8 +17,11 @@ void AExitTrigger::BeginPlay()
 
 AExitTrigger::AExitTrigger()
 {
-	OnActorBeginOverlap.AddDynamic(this, &AExitTrigger::OnOverlapBegin);
-	OnActorEndOverlap.AddDynamic(this, &AExitTrigger::OnOverlapEnd);
+	if (HasAuthority())
+	{
+		OnActorBeginOverlap.RemoveDynamic(this, &AExitTrigger::OnOverlapBegin);
+		OnActorBeginOverlap.AddDynamic(this, &AExitTrigger::OnOverlapBegin);
+	}
 }
 
 void AExitTrigger::OnOverlapBegin(AActor* _overlapActor, AActor* _otherActor)
@@ -39,8 +42,4 @@ void AExitTrigger::OnOverlapBegin(AActor* _overlapActor, AActor* _otherActor)
 			}
 		}
 	}
-}
-
-void AExitTrigger::OnOverlapEnd(AActor* _overlapActor, AActor* _otherActor)
-{
 }

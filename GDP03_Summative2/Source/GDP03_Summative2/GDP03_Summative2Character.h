@@ -130,13 +130,9 @@ public:
 	UPROPERTY(ReplicatedUsing = OnRep_IsGameOver, EditAnywhere, BlueprintReadWrite)
 		bool IsGameOver;
 
-	UFUNCTION()
-		void EndTheGame(bool _hasWon);
-
 	float clientTimeSinceUpdate;
 	float clientTimeBetweenLastUpdate;
 	FTransform clientStartTransform;
-	FVector clientStartVelocity;
 
 	FVector2D InputVector;
 
@@ -148,6 +144,8 @@ public:
 	void SimulateMove(FPMove move);
 
 	void ClientTick(float DeltaTime);
+
+	FPMove CreateMove(float DeltaTime);
 
 protected:
 	

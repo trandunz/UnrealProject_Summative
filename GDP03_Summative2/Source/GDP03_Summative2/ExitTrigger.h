@@ -22,6 +22,4 @@ public:
 
 	UFUNCTION()
 		void OnOverlapBegin(class AActor* _overlapActor, class AActor* _otherActor);
-	UFUNCTION()
-		void OnOverlapEnd(class AActor* _overlapActor, class AActor* _otherActor);
 };
