@@ -144,8 +144,7 @@ void AMovingPlatform::ClientTick(float DeltaTime)
 
 void AMovingPlatform::Server_SendMove_Implementation(FMPMove _move)
 {
-	FVector newLocation = SimulateMove(_move);
-	AddActorWorldOffset(newLocation * _move.deltaTime);
+	SetActorLocation(m_StartLocation + SimulateMove(_move));
 
 	serverState.currentMove = _move;
 	serverState.transform = GetActorTransform();

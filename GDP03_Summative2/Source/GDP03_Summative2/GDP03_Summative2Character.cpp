@@ -157,25 +157,28 @@ void AGDP03_Summative2Character::Tick(float _deltaTime)
 		FPMove move;
 		move.time = m_ElapsedTime;
 		move.deltaTime = _deltaTime;
-		move.rotation = GetActorRotation();
-		move.moveDirection = GetPendingMovementInputVector();
+		move.moveDirection = InputVector;
 
-		AddMove(move);
+		SimulateMove(move);
+
+		Moves.Add(move);
 
 		Server_SendMove(move);
 	}
-	/*if (HasAuthority() && IsLocallyControlled())
+	if (HasAuthority() && IsLocallyControlled())
 	{
 		m_ElapsedTime += _deltaTime;
 
 		FPMove move;
 		move.time = m_ElapsedTime;
 		move.deltaTime = _deltaTime;
-		move.rotation = GetActorRotation();
-		move.moveDirection = GetPendingMovementInputVector();
+		move.moveDirection = InputVector;
 
-		Server_SendMove(move);
-	}*/
+		SimulateMove(move);
+
+		serverState.currentMove = move;
+		serverState.transform = GetActorTransform();
+	}
 	if (GetLocalRole() == ROLE_SimulatedProxy)
 	{
 		ClientTick(_deltaTime);
@@ -251,7 +254,8 @@ bool AGDP03_Summative2Character::Server_OnFire_Validate()
 
 void AGDP03_Summative2Character::Server_SendMove_Implementation(FPMove _move)
 {
-	serverState.velocity = SimulateMove(_move);
+	SimulateMove(_move);
+
 	serverState.currentMove = _move;
 	serverState.transform = GetActorTransform();
 }
@@ -305,20 +309,21 @@ void AGDP03_Summative2Character::OnRep_IsGameOver()
 
 void AGDP03_Summative2Character::AutonomousProxy_OnRep_ServerState()
 {
-	SetActorTransform(serverState.transform);
-	Velocity = serverState.velocity;
 
-	for (auto& move : Moves)
-	{
-		move = {};
-	}
-	AddMove(serverState.currentMove);
-
-	for (auto& move : Moves)
-	{
-		AddActorWorldOffset(SimulateMove(move));
-	}
+	TArray<FPMove> newMoves;
 	
+	for (auto& move : Moves)
+	{
+		if (move.time > serverState.currentMove.time)
+		{
+			newMoves.Add(move);
+		}
+	}
+	Moves = newMoves;
+	for (auto& move : Moves)
+	{
+		SimulateMove(move);
+	}	
 }
 
 void AGDP03_Summative2Character::SimulatedProxy_OnRep_ServerState()
@@ -334,8 +339,7 @@ void AGDP03_Summative2Character::OnRep_ServerState()
 {
 	if (GetLocalRole() == ROLE_AutonomousProxy)
 	{
-		//AutonomousProxy_OnRep_ServerState();
-
+		AutonomousProxy_OnRep_ServerState();
 	}
 	else if (GetLocalRole() == ROLE_SimulatedProxy)
 	{
@@ -392,20 +396,12 @@ void AGDP03_Summative2Character::EndTouch(const ETouchIndex::Type FingerIndex, c
 
 void AGDP03_Summative2Character::MoveForward(float Value)
 {
-	if (Value != 0.0f)
-	{
-		// add movement in that direction
-		AddMovementInput(GetActorForwardVector(), Value);
-	}
+	InputVector.X = Value;
 }
 
 void AGDP03_Summative2Character::MoveRight(float Value)
 {
-	if (Value != 0.0f)
-	{
-		// add movement in that direction
-		AddMovementInput(GetActorRightVector(), Value);
-	}
+	InputVector.Y = Value;
 }
 
 void AGDP03_Summative2Character::TurnAtRate(float Rate)
@@ -420,15 +416,10 @@ void AGDP03_Summative2Character::LookUpAtRate(float Rate)
 	AddControllerPitchInput(Rate * BaseLookUpRate * GetWorld()->GetDeltaSeconds());
 }
 
-void AGDP03_Summative2Character::AddMove(FPMove _move)
+void AGDP03_Summative2Character::SimulateMove(FPMove move)
 {
-	int size = sizeof(Moves) / sizeof(FPMove);
-	Moves[(size + 1) % 5] = _move;
-}
-
-FVector AGDP03_Summative2Character::SimulateMove(FPMove move)
-{
-	return FQuat(move.rotation) * (move.moveDirection);
+	AddMovementInput(GetActorForwardVector(), move.moveDirection.X);
+	AddMovementInput(GetActorRightVector(), move.moveDirection.Y);
 }
 
 bool AGDP03_Summative2Character::EnableTouchscreenMovement(class UInputComponent* PlayerInputComponent)

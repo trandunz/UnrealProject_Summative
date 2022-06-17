@@ -22,9 +22,7 @@ struct FPMove
 		FPMove() {}
 
 	UPROPERTY()
-		FVector moveDirection = {0,0,0};
-	UPROPERTY()
-		FRotator rotation = { 0,0,0 };
+		FVector2D moveDirection;
 	UPROPERTY()
 		float deltaTime;
 	UPROPERTY()
@@ -42,8 +40,6 @@ struct FPServerState
 		FPMove currentMove;
 	UPROPERTY()
 		FTransform transform;
-	UPROPERTY()
-		FVector velocity;
 };
 
 UCLASS(config=Game)
@@ -142,17 +138,14 @@ public:
 	FTransform clientStartTransform;
 	FVector clientStartVelocity;
 
+	FVector2D InputVector;
 
-	FVector Velocity;
-
-	FPMove Moves[5];
+	TArray<FPMove> Moves;
 
 	UPROPERTY(ReplicatedUsing = OnRep_ServerState)
 	FPServerState serverState;
 
-	FVector SimulateMove(FPMove move);
-
-	void AddMove(FPMove _move);
+	void SimulateMove(FPMove move);
 
 	void ClientTick(float DeltaTime);
 
