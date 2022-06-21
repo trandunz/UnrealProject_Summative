@@ -127,9 +127,6 @@ public:
 	UPROPERTY(ReplicatedUsing = OnRep_HasWon, EditAnywhere, BlueprintReadWrite)
 		bool HasWon;
 
-	UPROPERTY(ReplicatedUsing = OnRep_IsGameOver, EditAnywhere, BlueprintReadWrite)
-		bool IsGameOver;
-
 	float clientTimeSinceUpdate;
 	float clientTimeBetweenLastUpdate;
 	FTransform clientStartTransform;
@@ -141,10 +138,21 @@ public:
 	UPROPERTY(ReplicatedUsing = OnRep_ServerState)
 	FPServerState serverState;
 
+	/// <summary>
+	/// Applies Character Movement based on Inputed Move
+	/// </summary>
+	/// <param name="Rate"></param>
 	void SimulateMove(FPMove move);
 
+	/// <summary>
+	/// Handles Simulated Proxy tick / Smoothing
+	/// </summary>
 	void ClientTick(float DeltaTime);
 
+	/// <summary>
+	/// Contructs and move from elapsed time, delta time and player input
+	/// </summary>
+	/// <param name="_deltaTime"></param>
 	FPMove CreateMove(float DeltaTime);
 
 protected:
@@ -154,30 +162,56 @@ protected:
 	/** Fires a projectile. */
 	void OnFire();
 
+	
 	UFUNCTION(Server, Reliable, WithValidation)
+		/// <summary>
+		/// Server RPC For firing bullet
+		/// </summary>
+		/// <param name="InputComponent"></param>
+		/// <returns></returns>
 		void Server_OnFire();
 
+	/// <summary>
+	/// Server RPC for simulating the move on server side and updating server state
+	/// </summary>
+	/// <returns></returns>
 	UFUNCTION(Server, Reliable, WithValidation)
 		void Server_SendMove(FPMove _move);
 
+	/// <summary>
+	/// Called when current health changes
+	/// </summary>
 	UFUNCTION()
 		void OnRep_CurrentHealth();
 
+	/// <summary>
+	/// Called when current objective changes
+	/// </summary>
 	UFUNCTION()
 		void OnRep_CurrentObjective();
 
+	/// <summary>
+	/// Called when HasWon Changes
+	/// </summary>
 	UFUNCTION()
 		void OnRep_HasWon();
 
-	UFUNCTION()
-		void OnRep_IsGameOver();
-
+	/// <summary>
+	/// Called when server state changes.
+	/// Spit into two parts. Autonomous Proxy And Simulated Proxy
+	/// </summary>
 	UFUNCTION()
 		void OnRep_ServerState();
 
+	/// <summary>
+	/// Handles Autonomous Proxy variation of On_ServerState
+	/// </summary>
 	UFUNCTION()
 		void AutonomousProxy_OnRep_ServerState();
 
+	/// <summary>
+	/// Handles Simulated Proxy variation of On_ServerState
+	/// </summary>
 	UFUNCTION()
 		void SimulatedProxy_OnRep_ServerState();
 

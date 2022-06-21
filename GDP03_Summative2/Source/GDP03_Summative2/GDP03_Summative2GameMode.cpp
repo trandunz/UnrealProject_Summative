@@ -22,14 +22,16 @@ AGDP03_Summative2GameMode::AGDP03_Summative2GameMode()
 	HUDClass = AGDP03_Summative2HUD::StaticClass();
 }
 
-void AGDP03_Summative2GameMode::OnMissionComplete(APawn* _intigatorPawn)
+void AGDP03_Summative2GameMode::OnMissionComplete(APawn* _winningPawn)
 {
-	AGDP03_Summative2Character* character = Cast< AGDP03_Summative2Character>(_intigatorPawn->GetController()->GetCharacter());
+	// Cast winning pawn to character and set has won too true
+	AGDP03_Summative2Character* character = Cast< AGDP03_Summative2Character>(_winningPawn->GetController()->GetCharacter());
 	if (character)
 	{
 		character->HasWon = true;
 	}
 
+	// get game state and disable all player input
 	AMyGameState* gameState = Cast<AMyGameState>(GetWorld()->GetGameState());
 	if (gameState)
 	{

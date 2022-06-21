@@ -16,6 +16,8 @@
 #include "Net/UnrealNetwork.h"
 
 DEFINE_LOG_CATEGORY_STATIC(LogFPChar, Warning, All);
+
+// Display_log macro for printing debug to top left of screen
 #define DISPLAY_LOG(fmt, ...) if (GEngine) GEngine->AddOnScreenDebugMessage(-1, 5.0f, FColor::Purple, FString::Printf(TEXT(fmt), __VA_ARGS__));
 
 //////////////////////////////////////////////////////////////////////////
@@ -23,10 +25,10 @@ DEFINE_LOG_CATEGORY_STATIC(LogFPChar, Warning, All);
 
 AGDP03_Summative2Character::AGDP03_Summative2Character()
 {
+	// Initalize Variables
 	CurrentHealth = 100;
 	CurrentObjective = "Retrieve Ball";
 	HasWon = false;
-	IsGameOver = false;
 
 	// Set size for collision capsule
 	GetCapsuleComponent()->InitCapsuleSize(55.f, 96.0f);
@@ -150,39 +152,52 @@ void AGDP03_Summative2Character::SetupPlayerInputComponent(class UInputComponent
 void AGDP03_Summative2Character::Tick(float _deltaTime)
 {
 	Super::Tick(_deltaTime);
+	// If Autonomous Proxy
 	if (GetLocalRole() == ROLE_AutonomousProxy)
 	{
+		// Add Elapsed Time
 		m_ElapsedTime += _deltaTime;
 
+		// Create A Move Based On Input
 		FPMove move = CreateMove(_deltaTime);
 
+		// Simulate / Execute The Move
 		SimulateMove(move);
 
+		// Add That Move To Moved Array
 		Moves.Add(move);
 
+		// Send The Move Too The Server
 		Server_SendMove(move);
 	}
+	// If Authority
 	if (HasAuthority() && IsLocallyControlled())
 	{
+		// Add Elapsed Time 
 		m_ElapsedTime += _deltaTime;
 
+		// Create A Move Based On Input
 		FPMove move = CreateMove(_deltaTime);
 
+		// Simulate / Execute The Move
 		SimulateMove(move);
 
+		// Update Server State
 		serverState.currentMove = move;
 		serverState.transform = GetActorTransform();
 	}
+	// If Simulated Proxy
 	if (GetLocalRole() == ROLE_SimulatedProxy)
 	{
+		// Update Simualted Proxy
 		ClientTick(_deltaTime);
 	}
 }
 
 void AGDP03_Summative2Character::OnFire()
 {
+	// Make Server Fire Bullet Instead Of Client
 	Server_OnFire();
-	
 
 	// try and play the sound if specified
 	if (FireSound != nullptr)
@@ -204,7 +219,6 @@ void AGDP03_Summative2Character::OnFire()
 
 void AGDP03_Summative2Character::Server_OnFire_Implementation()
 {
-	
 	// try and fire a projectile
 	if (ProjectileClass != nullptr)
 	{
@@ -234,7 +248,6 @@ void AGDP03_Summative2Character::Server_OnFire_Implementation()
 	}
 }
 
-
 bool AGDP03_Summative2Character::Server_OnFire_Validate()
 {
 	return true;
@@ -242,8 +255,10 @@ bool AGDP03_Summative2Character::Server_OnFire_Validate()
 
 void AGDP03_Summative2Character::Server_SendMove_Implementation(FPMove _move)
 {
+	// Simulate / Execute The Move
 	SimulateMove(_move);
 
+	// Update Server State
 	serverState.currentMove = _move;
 	serverState.transform = GetActorTransform();
 }
@@ -257,25 +272,30 @@ void AGDP03_Summative2Character::GetLifetimeReplicatedProps(TArray<FLifetimeProp
 {
 	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
 
+	// Replicate Variables
 	DOREPLIFETIME(AGDP03_Summative2Character, CurrentHealth);
 	DOREPLIFETIME(AGDP03_Summative2Character, CurrentObjective);
 	DOREPLIFETIME(AGDP03_Summative2Character, HasWon);
-	DOREPLIFETIME(AGDP03_Summative2Character, IsGameOver);
 	DOREPLIFETIME(AGDP03_Summative2Character, serverState);
 }
 
 void AGDP03_Summative2Character::OnRep_CurrentHealth()
 {
+	// If Autonomous Proxy Or Simulated Proxy
 	if (GetLocalRole() == ROLE_AutonomousProxy || GetLocalRole() == ROLE_SimulatedProxy)
 	{
+		// Check For Health less than 0
 		if (CurrentHealth <= 0)
 		{
+			// Get Player Controller
 			APlayerController* controller = Cast<APlayerController>(GetController());
 			if (controller)
 			{
+				// Gett Pawn From Controller
 				APawn* mPawn = controller->GetPawn();
 				if (mPawn)
 				{
+					// Disable The Input (Player Has Died)
 					mPawn->DisableInput(controller);
 				}
 			}
@@ -291,22 +311,24 @@ void AGDP03_Summative2Character::OnRep_HasWon()
 {
 }
 
-void AGDP03_Summative2Character::OnRep_IsGameOver()
-{
-}
-
 void AGDP03_Summative2Character::AutonomousProxy_OnRep_ServerState()
 {
+	// Commented Because It Was Updating position to last move 
+	// but we want autonomous proxy to move freely regardless of lag
+	//SetActorTransform(serverState.transform);
 
+	// Cleanup move array of redundant moves
 	TArray<FPMove> newMoves;
 	for (auto& move : Moves)
 	{
-		if (move.time > serverState.currentMove.time)
+		if (serverState.currentMove.time < move.time)
 		{
 			newMoves.Add(move);
 		}
 	}
 	Moves = newMoves;
+
+	// Simulate all remaining moves
 	for (auto& move : Moves)
 	{
 		SimulateMove(move);
@@ -341,14 +363,18 @@ void AGDP03_Summative2Character::OnResetVR()
 void AGDP03_Summative2Character::ClientTick(float DeltaTime)
 {
 	clientTimeSinceUpdate += DeltaTime;
+	// Make sure lerp radio wont be messed up
 	if (clientTimeSinceUpdate < KINDA_SMALL_NUMBER) { return; }
+
 	float lerpRatio = clientTimeSinceUpdate / clientTimeBetweenLastUpdate;
 
+	// Lerp Position
 	FVector targetLocation = serverState.transform.GetLocation();
 	FVector startLocation = clientStartTransform.GetLocation();
 	FVector newlocaton = FMath::Lerp(startLocation, targetLocation, lerpRatio);
 	SetActorLocation(newlocaton);
 
+	// Lerp Rotation
 	FQuat targetRotation = serverState.transform.GetRotation();
 	FQuat startRotation = clientStartTransform.GetRotation();
 	FQuat newRotation = FQuat::Slerp(startRotation, targetRotation, lerpRatio);

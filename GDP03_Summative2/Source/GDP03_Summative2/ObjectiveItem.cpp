@@ -26,6 +26,7 @@ AObjectiveItem::AObjectiveItem()
 	TriggerCollider->SetHiddenInGame(true);
 	TriggerCollider->SetVisibility(false);
 
+	// Replicate if has authority
 	if (HasAuthority())
 	{
 		bReplicates = true;
@@ -46,6 +47,7 @@ void AObjectiveItem::BeginPlay()
 {
 	Super::BeginPlay();
 
+	// Initialize Variables If Is Authority
 	if (HasAuthority())
 	{
 		m_StartLocation = GetActorLocation();
@@ -65,29 +67,41 @@ void AObjectiveItem::Tick(float DeltaTime)
 {
 	Super::Tick(DeltaTime);
 
+	// If Autonomous Proxy
 	if (GetLocalRole() == ROLE_AutonomousProxy)
 	{
+		// Add Elapsed Time
 		m_ElapsedTime += DeltaTime;
 
+		// Create A Move
 		FMove move = CreateMove(DeltaTime);
 
+		// Simulate / Execute The Move
 		SetActorLocation(m_StartLocation + SimulateMove(move));
 
+		// Add That Move To Moved Array
 		m_Moves.Add(move);
 
+		// Send The Move Too The Server
 		Server_SendMove(move);
 	}
+	// If Authority
 	if (HasAuthority() && IsLocallyControlled())
 	{
+		// Add Elapsed Time
 		m_ElapsedTime += DeltaTime;
 
+		// Create A Move
 		FMove move = CreateMove(DeltaTime);
 
+		// Simulate / Execute The Move
 		SetActorLocation(m_StartLocation + SimulateMove(move));
 
+		// Update Server State
 		serverState.currentMove = move;
 		serverState.transform = GetActorTransform();
 	}
+	// If Simulated Proxy
 	if (GetLocalRole() == ROLE_SimulatedProxy)
 	{
 		ClientTick(DeltaTime);
@@ -97,14 +111,17 @@ void AObjectiveItem::Tick(float DeltaTime)
 void AObjectiveItem::ClientTick(float DeltaTime)
 {
 	clientTimeSinceUpdate += DeltaTime;
+	// Make sure lerp radio wont be messed up
 	if (clientTimeSinceUpdate < KINDA_SMALL_NUMBER) { return; }
 	float lerpRatio = clientTimeSinceUpdate / clientTimeBetweenLastUpdate;
 
+	// Lerp Position
 	FVector targetLocation = serverState.transform.GetLocation();
 	FVector startLocation = clientStartTransform.GetLocation();
 	FVector newlocaton = FMath::Lerp(startLocation, targetLocation, lerpRatio);
 	SetActorLocation(newlocaton);
 
+	// Lerp Rotation
 	FQuat targetRotation = serverState.transform.GetRotation();
 	FQuat startRotation = clientStartTransform.GetRotation();
 	FQuat newRotation = FQuat::Slerp(startRotation, targetRotation, lerpRatio);
@@ -146,8 +163,10 @@ FMove AObjectiveItem::CreateMove(float DeltaTime)
 
 void AObjectiveItem::Server_SendMove_Implementation(FMove _move)
 {
+	// Simulate / Execute The Move
 	SetActorLocation(m_StartLocation + SimulateMove(_move));
 
+	// Update Server State
 	serverState.currentMove = _move;
 	serverState.transform = GetActorTransform();
 }
@@ -175,15 +194,20 @@ void AObjectiveItem::SimulatedProxy_OnRep_ServerState()
 
 void AObjectiveItem::AutonomousProxy_OnRep_ServerState()
 {
+	//SetActorTransform(serverState.transform);
+
+	// Cleanup move array of redundant moves
 	TArray<FMove> newMoves;
 	for (auto& move : m_Moves)
 	{
-		if (move.time > serverState.currentMove.time)
+		if (serverState.currentMove.time < move.time)
 		{
 			newMoves.Add(move);
 		}
 	}
 	m_Moves = newMoves;
+
+	// Simulate all remaining moves
 	for (auto& move : m_Moves)
 	{
 		SimulateMove(move);

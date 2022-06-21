@@ -16,30 +16,36 @@ TSharedPtr<class FOnlineSessionSearch> SearchSettings;
 
 AMyPlayerController::AMyPlayerController()
 {
+	// Get Active Subsystem and print it to console
 	IOnlineSubsystem* subSystem = Online::GetSubsystem(GetWorld());
-
 	UE_LOG(LogTemp, Warning, TEXT("[MyPlayerController] Found Subsystem %s"), *subSystem->GetSubsystemName().ToString());
 }
 
 void AMyPlayerController::Login()
 {
+	// Get Active Subsystem
 	IOnlineSubsystem* subSystem = Online::GetSubsystem(GetWorld());
 	if (subSystem)
 	{
 		IOnlineIdentityPtr identity = subSystem->GetIdentityInterface();
 		if (identity.IsValid())
 		{
+			// Get local Player
 			ULocalPlayer* localPlayer = Cast<ULocalPlayer>(Player);
 			if (localPlayer != NULL)
 			{
+				// Cache Controller ID
 				int controllerID = localPlayer->GetControllerId();
+
+				// If they are not logged in
 				if (identity->GetLoginStatus(controllerID) != ELoginStatus::LoggedIn)
 				{
+					// Set Login Complete Delegate
 					identity->AddOnLoginCompleteDelegate_Handle(
 						controllerID,
 						FOnLoginCompleteDelegate::CreateUObject(this, &AMyPlayerController::OnLoginCompleteDelegate)
 					);
-
+					// Login with controller iD
 					identity->AutoLogin(controllerID);
 				}
 			}
@@ -50,10 +56,11 @@ void AMyPlayerController::Login()
 bool AMyPlayerController::HostSession(bool _lan)
 {
 	IOnlineSubsystem* subSystem;
-		if (_lan) 
-			subSystem = Online::GetSubsystem(GetWorld(), NULL_SUBSYSTEM);
-		else
-			subSystem = Online::GetSubsystem(GetWorld());
+	// Get lan if host is set to lan else get steam if available
+	if (_lan) 
+		subSystem = Online::GetSubsystem(GetWorld(), NULL_SUBSYSTEM);
+	else
+		subSystem = Online::GetSubsystem(GetWorld());
 
 	if (subSystem)
 	{
@@ -63,6 +70,7 @@ bool AMyPlayerController::HostSession(bool _lan)
 		{
 			TSharedPtr<class FOnlineSessionSettings> sessionSettings = MakeShareable(new FOnlineSessionSettings());
 
+			// Setup session settings
 			sessionSettings->NumPrivateConnections = 6;
 			sessionSettings->NumPublicConnections = 4;
 
@@ -78,6 +86,7 @@ bool AMyPlayerController::HostSession(bool _lan)
 
 			sessionSettings->Set(SEARCH_KEYWORDS, FString("Custom"), EOnlineDataAdvertisementType::ViaOnlineServiceAndPing);
 
+			// Add On Create Session Delegate
 			session->AddOnCreateSessionCompleteDelegate_Handle
 			(
 				FOnCreateSessionCompleteDelegate::CreateUObject(this, &AMyPlayerController::OnCreateSessionCompleteDelegate)
@@ -85,6 +94,7 @@ bool AMyPlayerController::HostSession(bool _lan)
 
 			TSharedPtr<const FUniqueNetId> uniqueNetIdPtr = GetLocalPlayer()->GetPreferredUniqueNetId().GetUniqueNetId();
 
+			// Create the session with given settings
 			bool result = session->CreateSession(*uniqueNetIdPtr, SESSION_NAME, *sessionSettings);
 
 			if (result)
@@ -104,6 +114,7 @@ bool AMyPlayerController::HostSession(bool _lan)
 bool AMyPlayerController::FindSession(bool _lan)
 {
 	IOnlineSubsystem* subSystem;
+	// Get lan if set to lan else get steam if available
 	if (_lan)
 	{
 		IsLAN = true;
@@ -120,16 +131,19 @@ bool AMyPlayerController::FindSession(bool _lan)
 		IOnlineSessionPtr session = subSystem->GetSessionInterface();
 		if (session.IsValid())
 		{
+			// If Search Settings are already present, Reset it
 			if (SearchSettings.IsValid())
 			{
 				SearchSettings.Reset();
 			}
 			SearchSettings = MakeShareable(new FOnlineSessionSearch());
 
+			// Set query settings
 			SearchSettings->QuerySettings.Set(SEARCH_PRESENCE, true, EOnlineComparisonOp::Equals);
 			SearchSettings->QuerySettings.Set(SEARCH_LOBBIES, true, EOnlineComparisonOp::Equals);
 			SearchSettings->QuerySettings.Set(SEARCH_KEYWORDS, FString("Custom"), EOnlineComparisonOp::Equals);
 
+			// Ad OnFindSessionDelegate
 			session->AddOnFindSessionsCompleteDelegate_Handle
 			(
 				FOnFindSessionsCompleteDelegate::CreateUObject(this, &AMyPlayerController::OnFindSessionsCompleteDelegate)
@@ -138,6 +152,7 @@ bool AMyPlayerController::FindSession(bool _lan)
 			TSharedRef<FOnlineSessionSearch> searchSettingsRef = SearchSettings.ToSharedRef();
 			TSharedPtr<const FUniqueNetId> uniqueNetIdPtr = GetLocalPlayer()->GetPreferredUniqueNetId().GetUniqueNetId();
 
+			// Find sessions
 			return session->FindSessions(*uniqueNetIdPtr, searchSettingsRef);
 		}
 	}
@@ -161,6 +176,7 @@ bool AMyPlayerController::JoinSession(bool _lan)
 void AMyPlayerController::JoinSession(FOnlineSessionSearchResult _searchResult, bool _lan)
 {
 	IOnlineSubsystem* subSystem;
+	// Get lan if set to lan else get steam if available
 	if (_lan)
 		subSystem = Online::GetSubsystem(GetWorld(), NULL_SUBSYSTEM);
 	else
@@ -173,10 +189,12 @@ void AMyPlayerController::JoinSession(FOnlineSessionSearchResult _searchResult, 
 		{
 			if (_searchResult.IsValid())
 			{
+				// Add on join session delegate
 				session->AddOnJoinSessionCompleteDelegate_Handle(FOnJoinSessionCompleteDelegate::CreateUObject(this, &AMyPlayerController::OnJoinSessionCompleteDelegate));
 
 				TSharedPtr<const FUniqueNetId> uniqueNetIdPtr = GetLocalPlayer()->GetPreferredUniqueNetId().GetUniqueNetId();
 
+				// Join session
 				session->JoinSession(*uniqueNetIdPtr, SESSION_NAME, _searchResult);
 
 				DISPLAY_LOG("Joining Session!");
@@ -191,13 +209,21 @@ void AMyPlayerController::JoinSession(FOnlineSessionSearchResult _searchResult, 
 
 void AMyPlayerController::QuitSession()
 {
-	IOnlineSubsystem* subSystem = Online::GetSubsystem(GetWorld());
+	IOnlineSubsystem* subSystem;
+	// Get lan if set to lan else get steam if available
+	if (IsLAN)
+		subSystem = Online::GetSubsystem(GetWorld(), NULL_SUBSYSTEM);
+	else
+		subSystem = Online::GetSubsystem(GetWorld());
+
 	if (subSystem)
 	{
 		IOnlineSessionPtr session = subSystem->GetSessionInterface();
 		if (session.IsValid())
 		{
+			// Destory the session
 			session->DestroySession(SESSION_NAME);
+			// Open main Menu
 			UGameplayStatics::OpenLevel
 			(
 				this,
@@ -220,8 +246,10 @@ void AMyPlayerController::OnLoginCompleteDelegate(int32 _localUserNum, bool _was
 			FUniqueNetIdRepl uniqueNetID = PlayerState->GetUniqueId();
 			uniqueNetID.SetUniqueNetId(FUniqueNetIdWrapper(_userID).GetUniqueNetId());
 
+			// Set Net ID
 			PlayerState->SetUniqueId(uniqueNetID);
 
+			// Display Login Status
 			int controllerID = localPlayer->GetControllerId();
 			ELoginStatus::Type status = identity->GetLoginStatus(controllerID);
 			DISPLAY_LOG("Login Status: %s", ELoginStatus::ToString(status));
@@ -238,6 +266,7 @@ void AMyPlayerController::OnCreateSessionCompleteDelegate(FName _inSessionName, 
 {
 	if (_wasSuccessful)
 	{
+		// Open first Person Map
 		UGameplayStatics::OpenLevel
 		(
 			this,
@@ -280,11 +309,14 @@ void AMyPlayerController::OnJoinSessionCompleteDelegate(FName _sessionName, EOnJ
 		IOnlineSessionPtr session = subSystem->GetSessionInterface();
 		if (session.IsValid())
 		{
+			// If join session success
 			if (_result == EOnJoinSessionCompleteResult::Success)
 			{
 				FString connectInfo;
+				// Get connect info
 				if (session->GetResolvedConnectString(SESSION_NAME, connectInfo))
 				{
+					// Travel To Session With Connect Info
 					UE_LOG_ONLINE_SESSION(Log, TEXT("Joined Session!: Travelling to %s"), *connectInfo);
 					AMyPlayerController::ClientTravel(connectInfo, TRAVEL_Absolute);
 				}

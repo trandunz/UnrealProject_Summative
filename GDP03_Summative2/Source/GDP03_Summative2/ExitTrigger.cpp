@@ -26,11 +26,14 @@ AExitTrigger::AExitTrigger()
 
 void AExitTrigger::OnOverlapBegin(AActor* _overlapActor, AActor* _otherActor)
 {
+	// Check if other actor is not this
 	if (_otherActor && _otherActor != this)
 	{
+		// Get character From Other Actor
 		AGDP03_Summative2Character* charactor = Cast< AGDP03_Summative2Character>(_otherActor);
 		if (charactor)
 		{
+			// If current objective is too get to exit, Change it to, you win, and call mission complete
 			if (charactor->CurrentObjective == "Get To Exit")
 			{
 				charactor->CurrentObjective = "You Win!";

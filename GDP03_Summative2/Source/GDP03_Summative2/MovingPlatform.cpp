@@ -15,6 +15,7 @@ AMovingPlatform::AMovingPlatform()
 	Mesh = CreateDefaultSubobject<UStaticMeshComponent>("Platform");
 	Mesh->SetupAttachment(RootComponent);
 
+	// Replicate if it has authority
 	if (HasAuthority())
 	{
 		bReplicates = true;
@@ -27,6 +28,7 @@ void AMovingPlatform::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutL
 {
 	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
 
+	// Relicate server state
 	DOREPLIFETIME(AMovingPlatform, serverState);
 }
 
@@ -35,6 +37,7 @@ void AMovingPlatform::BeginPlay()
 {
 	Super::BeginPlay();
 
+	// If it has authority, initialize variables
 	if (HasAuthority())
 	{
 		m_StartLocation = GetActorLocation();
@@ -45,6 +48,7 @@ void AMovingPlatform::BeginPlay()
 
 FVector AMovingPlatform::SimulateMove(FMPMove move)
 {
+	// Return movement based on move axis
 	if (MoveAxis.X != 0)
 	{
 		return FVector(move.movementAmplitude * cosf(move.time * move.movementSpeed), 0, 0);
@@ -87,31 +91,44 @@ void AMovingPlatform::Tick(float DeltaTime)
 {
 	Super::Tick(DeltaTime);
 
+	// If Autonomous Proxy
 	if (GetLocalRole() == ROLE_AutonomousProxy)
 	{
+		// Add Elapsed Time
 		m_ElapsedTime += DeltaTime;
 
+		// Create A Move
 		FMPMove move = CreateMove(DeltaTime);
 
+		// Simulate / Execute The Move
 		SetActorLocation(m_StartLocation + SimulateMove(move));
 
+		// Add That Move To Moved Array
 		Moves.Add(move);
 
+		// Send The Move Too The Server
 		Server_SendMove(move);
 	}
+	// If Authority
 	if (HasAuthority() && IsLocallyControlled())
 	{
+		// Add Elapsed Time
 		m_ElapsedTime += DeltaTime;
 
+		// Create A Move
 		FMPMove move = CreateMove(DeltaTime);
 
+		// Simulate / Execute The Move
 		SetActorLocation(m_StartLocation + SimulateMove(move));
 
+		// Update Server State
 		serverState.currentMove = move;
 		serverState.transform = GetActorTransform();
 	}
+	// If Simulated Proxy
 	if (GetLocalRole() == ROLE_SimulatedProxy)
 	{
+		// Update Simualted Proxy
 		ClientTick(DeltaTime);
 	}
 }
@@ -119,14 +136,17 @@ void AMovingPlatform::Tick(float DeltaTime)
 void AMovingPlatform::ClientTick(float DeltaTime)
 {
 	clientTimeSinceUpdate += DeltaTime;
+	// Make sure lerp radio wont be messed up
 	if (clientTimeSinceUpdate < KINDA_SMALL_NUMBER) { return; }
 	float lerpRatio = clientTimeSinceUpdate / clientTimeBetweenLastUpdate;
 
+	// Lerp Position
 	FVector targetLocation = serverState.transform.GetLocation();
 	FVector startLocation = clientStartTransform.GetLocation();
 	FVector newlocaton = FMath::Lerp(startLocation, targetLocation, lerpRatio);
 	SetActorLocation(newlocaton);
 
+	// Lerp Rotation
 	FQuat targetRotation = serverState.transform.GetRotation();
 	FQuat startRotation = clientStartTransform.GetRotation();
 	FQuat newRotation = FQuat::Slerp(startRotation, targetRotation, lerpRatio);
@@ -145,8 +165,10 @@ FMPMove AMovingPlatform::CreateMove(float DeltaTime)
 
 void AMovingPlatform::Server_SendMove_Implementation(FMPMove _move)
 {
+	// Simulate / Execute The Move
 	SetActorLocation(m_StartLocation + SimulateMove(_move));
 
+	// Update Server State
 	serverState.currentMove = _move;
 	serverState.transform = GetActorTransform();
 }
@@ -179,15 +201,20 @@ void AMovingPlatform::SimulatedProxy_OnRep_ServerState()
 
 void AMovingPlatform::AutonomousProxy_OnRep_ServerState()
 {
+	//SetActorTransform(serverState.transform);
+
+	// Cleanup move array of redundant moves
 	TArray<FMPMove> newMoves;
 	for (auto& move : Moves)
 	{
-		if (move.time > serverState.currentMove.time)
+		if (serverState.currentMove.time < move.time)
 		{
 			newMoves.Add(move);
 		}
 	}
 	Moves = newMoves;
+
+	// Simulate all remaining moves
 	for (auto& move : Moves)
 	{
 		SimulateMove(move);

@@ -32,6 +32,7 @@ AGDP03_Summative2Projectile::AGDP03_Summative2Projectile()
 	// Die after 3 seconds by default
 	InitialLifeSpan = 3.0f;
 
+	// Replicate it it is on server
 	if (HasAuthority())
 	{
 		bReplicates = true;
@@ -50,9 +51,12 @@ void AGDP03_Summative2Projectile::OnHit(UPrimitiveComponent* HitComp, AActor* Ot
 		{
 			if (GetLocalRole() == ROLE_Authority)
 			{
+				// Decrease PPlayer Health By 10
 				if (mCharacter->CurrentHealth > 0)
 					mCharacter->CurrentHealth -= 10;
 
+				// Check if player died
+				// If true, disable player input
 				if (mCharacter->CurrentHealth <= 0)
 				{
 					APlayerController* controller = Cast<APlayerController>(mCharacter->GetController());

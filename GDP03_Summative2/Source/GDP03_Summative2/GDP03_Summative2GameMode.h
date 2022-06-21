@@ -16,7 +16,11 @@ public:
 	AGDP03_Summative2GameMode();
 
 	UFUNCTION()
-		void OnMissionComplete(APawn* _intigatorPawn);
+		/// <summary>
+		/// Handles Mission Completion
+		/// </summary>
+		/// <param name="_winningPawn"></param>
+		void OnMissionComplete(APawn* _winningPawn);
 
 protected:
 
